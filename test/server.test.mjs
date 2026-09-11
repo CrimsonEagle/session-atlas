@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import net from 'node:net';
+import http from 'node:http';
+import {spawn} from 'node:child_process';
+import {once} from 'node:events';
+
+test('HTTP API is local, rejects foreign origins/mutations, validates settings and shuts down',async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'session-atlas-http-'));
+ await fs.writeFile(path.join(dir,'settings.json'),JSON.stringify({intervalSeconds:30,claudeRoots:[],codexRoots:[],prices:{}}));
+ const reserve=net.createServer();reserve.listen(0,'127.0.0.1');await once(reserve,'listening');const port=reserve.address().port;await new Promise(r=>reserve.close(r));
+ const child=spawn(process.execPath,['server.mjs'],{cwd:process.cwd(),env:{...process.env,ATLAS_PORT:String(port),ATLAS_DATA_DIR:dir},windowsHide:true,stdio:['ignore','pipe','pipe']});
+ t.after(async()=>{if(child.exitCode===null){child.kill();await once(child,'exit');}if(path.dirname(dir)!==os.tmpdir()||!path.basename(dir).startsWith('session-atlas-http-'))throw Error('Unexpected cleanup path');await fs.rm(dir,{recursive:true,force:true});});
+ await once(child.stdout,'data');const base=`http://127.0.0.1:${port}`;
+ assert.equal((await fetch(base+'/')).status,200);
+ assert.equal((await fetch(base+'/api/snapshot',{headers:{Origin:'https://untrusted.example'}})).status,403);
+ const foreignHostStatus=await new Promise((resolve,reject)=>{http.get(base+'/api/snapshot',{headers:{Host:'untrusted.example'}},res=>{res.resume();resolve(res.statusCode);}).on('error',reject);});
+ assert.equal(foreignHostStatus,403);
+ assert.equal((await fetch(base+'/api/settings',{method:'POST',body:'{}'})).status,403);
+ const bootstrap=await(await fetch(base+'/api/bootstrap')).json();const post=(endpoint,x)=>fetch(base+endpoint,{method:'POST',headers:{'Content-Type':'application/json','X-Atlas-Token':bootstrap.token},body:JSON.stringify(x)});
+ assert.equal((await post('/api/settings',{...bootstrap.settings,intervalSeconds:1})).status,400);
+ assert.equal((await post('/api/settings',{...bootstrap.settings,claudeRoots:['relative/path']})).status,400);
+ assert.equal((await post('/api/settings',{...bootstrap.settings,intervalSeconds:10})).status,200);
+ const result=await(await post('/api/refresh',{})).json();assert.deepEqual(result.sessions,[]);assert.equal(result.stats.scanCount,1);
+ const snapshot=await(await fetch(base+'/api/snapshot')).json();assert.equal(snapshot.stats.scanCount,1);
+ assert.equal((await fetch(base+'/.local/settings.json')).status,404);
+ assert.equal((await post('/api/shutdown',{})).status,200);await once(child,'exit');
+});
