@@ -90,5 +90,18 @@ dialog{box-shadow:0 25px 100px var(--shadow);overflow:auto}
 .chart-tooltip>div span{display:flex;align-items:center;gap:7px}
 .chart-tooltip b{color:var(--ink);font-weight:650}
 .chart-tooltip .chart-tooltip-total{margin-top:5px;padding-top:8px;border-top:1px solid var(--line-soft);color:var(--ink)}
+.limits-panel>h2{font-size:21px;letter-spacing:-.45px;margin-bottom:25px}
+.limits-panel .provider-heading{margin-bottom:19px}
+.limits-panel .tool-tag{font-size:12px;font-weight:600}
+.limits-panel .limit-line{font-size:12px;margin:16px 0 8px}
+.limits-panel .limit-line strong{font-size:15px;font-weight:700}
+.limits-panel .track{height:9px;border-radius:9px}
+.limits-panel .track i{border-radius:9px}
+.limits-panel .reset-note{margin-top:7px}
+.rolling-costs{display:flex;justify-content:space-between;gap:12px;margin-top:17px;padding:12px 13px;background:var(--surface-soft);border:1px solid var(--line-soft);border-radius:8px;color:var(--muted);font-size:10px}
+.rolling-costs span{display:flex;align-items:center;gap:7px}
+.rolling-costs strong{color:var(--ink);font-size:12px;white-space:nowrap}
+@media(min-width:1181px){.dashboard-grid{grid-template-columns:minmax(0,1fr) 380px}}
+@media(min-width:961px) and (max-width:1180px){.dashboard-grid{grid-template-columns:minmax(0,1fr) 340px}}
 @media(prefers-reduced-motion:reduce){.chart-hover-zone,.chart-bar{transition:none}}
-@media(max-width:620px){.theme-control{gap:0}.theme-label,.theme-choice-text{display:none}.theme-options button{width:29px;padding:5px;justify-content:center}.price-notice,.price-help-row{align-items:flex-start;flex-direction:column;gap:10px}.notice-action,.info-button{width:100%;justify-content:center}.price-format-list li{grid-template-columns:28px 1fr;gap:5px 10px}.price-format-list li span{grid-column:2}}
+@media(max-width:620px){.theme-control{gap:0}.theme-label,.theme-choice-text{display:none}.theme-options button{width:29px;padding:5px;justify-content:center}.price-notice,.price-help-row{align-items:flex-start;flex-direction:column;gap:10px}.notice-action,.info-button{width:100%;justify-content:center}.price-format-list li{grid-template-columns:28px 1fr;gap:5px 10px}.price-format-list li span{grid-column:2}.limits-panel{display:block}.limits-panel .limit-group+.limit-group{border-top:1px solid var(--line);padding-top:20px;margin-top:22px}}
