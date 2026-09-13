@@ -69,14 +69,22 @@ export function analytics(sessions=[]) {
  return {...summary,sessionCount:sessions.length,activeDays,cacheRatio:inputBase?summary.cache/inputBase:0,priceCoverage:summary.requests?priced/summary.requests:0,averagePerSession:sessions.length?summary.tokens/sessions.length:0,averagePerRequest:summary.requests?summary.tokens/summary.requests:0,top3Share:summary.tokens?top3/summary.tokens:0};
 }
 
-export function bucketSeries(sessions=[],metric='tokens',maxBuckets=24) {
+export function bucketSeries(sessions=[],metric='tokens',maxBuckets=60) {
  const events=sessions.flatMap(session=>session.events.map(event=>({...event,tool:session.tool})));
  if(!events.length)return {period:'day',rows:[]};
  const times=events.map(event=>Date.parse(event.time)).filter(Number.isFinite).sort((a,b)=>a-b);if(!times.length)return {period:'day',rows:[]};
- const spanDays=Math.max(1,(times.at(-1)-times[0])/86400000),period=spanDays>540?'month':spanDays>70?'week':'day';
+ // Period thresholds keep the filled series inside maxBuckets, so no active period is cut off.
+ const spanDays=Math.max(1,(times.at(-1)-times[0])/86400000),period=spanDays>420?'month':spanDays>59?'week':'day';
  const keyFor=value=>{const date=new Date(value);date.setHours(0,0,0,0);if(period==='week')date.setDate(date.getDate()-((date.getDay()+6)%7));if(period==='month')date.setDate(1);return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;};
  const map=new Map();
  for(const event of events){const key=keyFor(event.time);if(!map.has(key))map.set(key,{key,codex:0,claude:0});const value=metric==='cost'?(event.cost||0):metric==='requests'?1:tokenCount(event);map.get(key)[event.tool]+=value;}
- let rows=[...map.values()].sort((a,b)=>a.key.localeCompare(b.key));if(rows.length>maxBuckets)rows=rows.slice(-maxBuckets);
+ // Idle periods become explicit zero buckets: a chart axis must not skip time, and the hover zones
+ // of the rendered chart have to tile the plot without gaps.
+ const keys=[...map.keys()].sort(),last=keys.at(-1),cursor=new Date(keys[0]+'T00:00:00');let rows=[];
+ for(let guard=0;guard<1200;guard++) {
+  const key=keyFor(cursor);rows.push(map.get(key)||{key,codex:0,claude:0});if(key>=last)break;
+  if(period==='month')cursor.setMonth(cursor.getMonth()+1);else cursor.setDate(cursor.getDate()+(period==='week'?7:1));
+ }
+ if(rows.length>maxBuckets)rows=rows.slice(-maxBuckets);
  return {period,rows};
 }

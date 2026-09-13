@@ -25,7 +25,7 @@ npm start
 - Live-Übersicht, gestapelte Verlaufsdiagramme für Tokens/Kosten, Tages-/Wochen-/Monatsaggregation.
 - Sessions, Repositories, Arbeitsordner, KI-Tools und Modelle als Gruppierungen; Suche und kombinierte Filter; eigene Datumsbereiche.
 - Sessiondetails mit Modellantworten, Branch, Arbeitsordner, Kontextstand, Input-/Output-/Cache-/Reasoning-Tokens.
-- Codex-5h-/Wochenlimits aus den letzten protokollierten `rate_limits`, inklusive Messzeitpunkt und Reset. Abgelaufene Messwerte erscheinen als unbekannt, nicht als 0 %.
+- 5-Stunden-/Wochenlimits für beide Tools, inklusive Plan, Messzeitpunkt und Reset: Codex aus den letzten protokollierten `rate_limits`, Claude Code aus `cachedUsageUtilization` in `.claude.json` und optional aus der Statusline-Bridge. Angezeigt wird jeweils der jüngere Messwert samt Quelle. Abgelaufene Messwerte erscheinen als unbekannt, nicht als 0 %.
 - Rollierende Kosten der letzten 5 Stunden / 7 Tage für beide Tools. Diese sind **kein identisches Abrechnungsfenster** und kein Ersatz für prozentuale Abolimits.
 - Manuelles Aktualisieren und automatischer Scan (Standard 30 s, einstellbar 10–3600 s).
 - Fokusverlust, anderer Browsertab oder minimiertes Fenster stoppen weitere automatische Scans. Bei Rückkehr sofortige Aktualisierung. Ein schon laufender Scan darf zu Ende laufen. Ein zusätzlich geöffnetes, fokussiertes App-Fenster kann weiterhin Scans auslösen. Der Server hat keinen Hintergrund-Polling-Timer und keine Dateiwatcher.
@@ -39,16 +39,32 @@ Standardmäßig werden diese Ordner gelesen:
 
 | Tool | Datenquelle |
 | --- | --- |
-| Claude Code | `%USERPROFILE%\.claude\projects` inklusive `subagents` |
+| Claude Code | `%USERPROFILE%\.claude\projects` inklusive `subagents`; Limits zusätzlich aus `%USERPROFILE%\.claude.json` und, falls eingerichtet, aus `%USERPROFILE%\.claude\session-atlas-limits.json` |
 | Codex | `%USERPROFILE%\.codex\sessions` und `archived_sessions` |
 
 `CLAUDE_CONFIG_DIR` und `CODEX_HOME` überschreiben das jeweilige Stammverzeichnis beim ersten Start. Weitere absolute Quellordner lassen sich in den Einstellungen ergänzen (auch erreichbare UNC-/WSL-Verzeichnisse). Daten auf anderen Rechnern oder im Browser werden nicht automatisch erfasst.
 
-Die Dateien werden **nur gelesen**. Kein Zugriff auf Zugangsdaten. Prompts und Antworten werden beim Parsen verworfen. Der lokale Cache enthält Nutzungsereignisse, Session-IDs, Metadaten wie Arbeitsordner/Branch/Sessiontitel und zuletzt gemeldete Codex-Limits. Diese Daten liegen in `.local/usage-cache.json`, Einstellungen in `.local/settings.json`. Der Server ist ausschließlich an `127.0.0.1` gebunden; fremde Origins und Änderungen ohne lokalen Sitzungstoken werden abgewiesen.
+Die Dateien werden **nur gelesen**. Kein Zugriff auf Zugangsdaten. Prompts und Antworten werden beim Parsen verworfen. Aus `.claude.json` werden ausschließlich Plan, Messzeitpunkt und die beiden Limitfenster gelesen; Account-Kennung, Projektliste und Prompt-Historie derselben Datei bleiben ungelesen und werden **nicht** zwischengespeichert. Die optionale Statusline-Bridge ist der einzige Teil, der überhaupt schreibt: Claude Code ruft sie beim Rendern der Statusline auf, sie legt ausschließlich den Limitblock in `session-atlas-limits.json` ab und verwirft Modell, Arbeitsordner, Branch und alle übrigen Felder ihrer Eingabe. Der Server selbst schreibt nie in die Quellordner. Der lokale Cache enthält Nutzungsereignisse, Session-IDs, Metadaten wie Arbeitsordner/Branch/Sessiontitel und zuletzt gemeldete Codex-Limits. Diese Daten liegen in `.local/usage-cache.json`, Einstellungen in `.local/settings.json`. Der Server ist ausschließlich an `127.0.0.1` gebunden; fremde Origins und Änderungen ohne lokalen Sitzungstoken werden abgewiesen.
 
 Neue Dateiinhalte werden ab dem letzten vollständig gelesenen Zeilenende verarbeitet. Unveränderte Dateien werden nicht erneut gelesen. Ungültige vollständige Zeilen werden übersprungen und gezählt; eine gerade geschriebene Schlusszeile wird beim nächsten Scan vervollständigt. Nutzungsdaten gelöschter Quelldateien bleiben im Cache historisch verfügbar. Entfernte Datenquellen fließen nicht mehr in Auswertungen ein. Für einen vollständigen Neuimport: App beenden und `.local/usage-cache.json` entfernen.
 
 Git-Repositories werden anhand der `.git`-Metadaten erkannt, Worktrees über `commondir` zugeordnet. Nicht mehr vorhandene Projektordner bleiben anhand ihres protokollierten Arbeitsordners auswertbar.
+
+### Claude-Limits aktuell halten (optional)
+
+Claude Code schreibt `cachedUsageUtilization` nur, wenn es die Werte selbst abruft, nicht bei jeder Antwort. Der Messwert kann dadurch mehrere Tage alt sein. Die mitgelieferte Bridge hängt sich an die dokumentierte Statusline-Schnittstelle und hinterlegt bei jedem Rendern einen frischen Wert. Dafür in der `settings.json` von **Claude Code** eintragen:
+
+```json
+"statusLine": { "command": "node \"C:\\Pfad\\zu\\Session-Atlas\\bridge\\atlas-statusline.mjs\"" }
+```
+
+Wer bereits eine Statusline nutzt, stellt den bisherigen Befehl dahinter. Die Bridge reicht die unveränderte Eingabe weiter und überlässt ihm die Ausgabe:
+
+```powershell
+node "C:\Pfad\zu\Session-Atlas\bridge\atlas-statusline.mjs" -- bash mein-skript.sh
+```
+
+Mit `--quiet` schreibt sie nur die Datei und gibt nichts aus. `ATLAS_RATE_LIMIT_FILE` verschiebt die Zieldatei. Pro Statusline-Rendern startet ein kurzer Node-Prozess; wie oft das geschieht, steuert die Claude-Code-Einstellung `statusLine.refreshInterval`. Fehler bleiben folgenlos: Bei ungültiger Eingabe, fehlenden Limitfeldern oder nicht startbarem Folgebefehl schreibt die Bridge nichts und endet mit Code 0, damit die Statusline nicht bricht. Den erwarteten Pfad und den aktuellen Status zeigt die App unter **Einstellungen → Claude-Limits aktuell halten**.
 
 ## Zählung und bekannte Grenzen
 
@@ -64,7 +80,7 @@ Claude-Antworten werden anhand der Message-ID dedupliziert, Streaming-Chunks zus
 
 Neuere Codex-Logs enthalten eindeutige `token_usage_record`-Einträge pro Antwort. Diese haben innerhalb einer Datei Vorrang vor den parallel geschriebenen kumulativen Snapshots. Ältere Logs verwenden die Differenz von `total_token_usage`; unveränderte wiederholte Snapshots zählen nicht erneut. Geerbte Elternereignisse vor dem Sessionbeginn bzw. mit anderer Thread-ID werden ausgeschlossen. Seltene gemischte Logs, in denen nur ein Teil der Laufzeit Antwortdatensätze enthält, können deshalb weniger Nutzungsereignisse ausweisen. Alte Logs ohne Nutzungsfelder liefern keine nachträglich rekonstruierbaren Tokenzahlen.
 
-Claude-Prozentlimits stehen in den hier unterstützten lokalen Session-Logs nicht zur Verfügung. Die App verwendet keine undokumentierten Account-Endpunkte oder OAuth-Zugangsdaten. Codex-Limits sind **zuletzt protokollierte**, accountweite Werte; ohne neue Codex-Aktivität werden sie nicht frischer. Mehrere Konten unter denselben Quellordnern können nicht zuverlässig getrennt werden.
+Die App verwendet keine undokumentierten Account-Endpunkte oder OAuth-Zugangsdaten. Limits beider Tools sind **zuletzt gemessene**, accountweite Werte; ohne neue Aktivität des jeweiligen Tools werden sie nicht frischer. Claude Code schreibt `cachedUsageUtilization` nur, wenn es die Werte selbst abruft — nicht bei jeder Antwort. Der Messwert kann daher mehrere Tage alt sein; die optionale Statusline-Bridge hält ihn aktuell. Ein abgelaufenes Fenster wird als unbekannt ausgewiesen, nicht als 0 %. In den Session-Logs selbst stehen die Prozentwerte weiterhin nicht. Mehrere Konten unter denselben Quellordnern können nicht zuverlässig getrennt werden.
 
 Kosten sind **API-Gegenwerte in USD, keine Abo-Rechnung**. Preisstand: 11.09.2026. Cache-TTL, bekannte Fast-Tarife und bekannte Kontextaufschläge werden berücksichtigt. Historische Preiswechsel, Kontorabatte, regionale Besonderheiten und zusätzliche Server-Toolgebühren können abweichen. Unbekannte Modelle (etwa interne Review-Aliasse) bekommen **keinen erfundenen Preis**. Bekannte Kostensummen sind Schätzungen und können höher ausfallen; vollständig unbekannte Kosten tragen `–`. Eigene Preise in den Einstellungen ergänzen.
 

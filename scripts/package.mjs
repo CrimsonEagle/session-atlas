@@ -13,7 +13,7 @@ async function collect(name) {
  if(stat.isDirectory()){for(const child of await fs.readdir(absolute))await collect(path.join(name,child));}
  else entries.push({name:'Session-Atlas/'+name.replaceAll('\\','/'),data:await fs.readFile(absolute)});
 }
-for(const name of ['package.json','server.mjs','launcher.mjs','Start.cmd','README.md','LICENSE','lib','public','scripts/package.mjs'])await collect(name);
+for(const name of ['package.json','server.mjs','launcher.mjs','Start.cmd','README.md','LICENSE','lib','public','bridge','scripts/package.mjs'])await collect(name);
 const table=Uint32Array.from({length:256},(_,n)=>{for(let k=0;k<8;k++)n=n&1?0xedb88320^(n>>>1):n>>>1;return n>>>0;});
 function crc32(data){let crc=0xffffffff;for(const byte of data)crc=table[(crc^byte)&255]^(crc>>>8);return (crc^0xffffffff)>>>0;}
 const local=[],central=[];let offset=0;

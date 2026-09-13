@@ -31,5 +31,7 @@ test('Duplicate files and concurrent refresh requests do not multiply usage',asy
 });
 test('Git worktree resolves to common repository root',async t=>{
  const {dir}=await fixture(t),repo=path.join(dir,'repo'),worktree=path.join(dir,'worktree'),gitDir=path.join(repo,'.git','worktrees','branch');await fs.mkdir(gitDir,{recursive:true});await fs.mkdir(worktree);await fs.writeFile(path.join(worktree,'.git'),`gitdir: ${gitDir}`);await fs.writeFile(path.join(gitDir,'commondir'),'../..');
- const s=new Store(path.join(dir,'cache.json'));assert.equal(await s.repository(worktree),repo);
+ // repository() canonicalizes its result, so the expectation has to be canonical too: a TMP
+ // pointing at an 8.3 short path would otherwise fail the comparison on spelling alone.
+ const s=new Store(path.join(dir,'cache.json'));assert.equal(await s.repository(worktree),await fs.realpath(repo));
 });

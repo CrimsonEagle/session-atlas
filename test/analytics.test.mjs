@@ -22,3 +22,10 @@ test('series separates providers and supports request counts',()=>{
  const result=bucketSeries(sessions,'requests');assert.equal(result.rows.length,2);
  assert.deepEqual(result.rows.map(row=>[row.codex,row.claude]),[[1,0],[1,1]]);
 });
+
+test('series fills idle periods so the chart axis never skips time',()=>{
+ const gapped=[{id:'three',tool:'codex',repository:'C:/repo-b',branch:'main',subagent:false,events:[event('2026-09-10T10:00:00Z','gpt',100),event('2026-09-14T10:00:00Z','gpt',100)]}];
+ const result=bucketSeries(gapped,'requests');assert.equal(result.period,'day');
+ assert.deepEqual(result.rows.map(row=>row.codex),[1,0,0,0,1]);
+ const keys=result.rows.map(row=>row.key);assert.deepEqual([...keys].sort(),keys);
+});
