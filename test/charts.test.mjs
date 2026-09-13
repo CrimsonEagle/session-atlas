@@ -22,6 +22,14 @@ test('every period carries a tooltip payload, an idle one included',()=>{
  assert.ok(payloads.every(payload=>payload.title));
 });
 
+test('selectable chart exposes bucket controls and its selected state',()=>{
+ const svg=seriesChart({rows,format,period:'day',selectable:true,selectedKey:'2026-09-11'});
+ assert.match(svg,/data-chart-bucket="2026-09-11"/);
+ assert.match(svg,/role="group"/);
+ assert.match(svg,/class="chart-column selectable selected"[^>]*role="button"[^>]*aria-pressed="true"/);
+ assert.equal((svg.match(/aria-pressed="false"/g)||[]).length,2);
+});
+
 test('gradients are namespaced so two charts on one page keep their colors',()=>{
  const main=seriesChart({rows,format,period:'day',idPrefix:'chart-main'}),detail=seriesChart({rows,format,period:'day',idPrefix:'detail-series'});
  assert.match(main,/id="chart-main-codex"/);assert.match(main,/fill="url\(#chart-main-claude\)"/);

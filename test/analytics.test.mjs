@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {analytics,bucketSeries,grouped,selectGroup,totals} from '../public/analytics-core.js';
+import {analytics,bucketSeries,grouped,periodKey,selectGroup,selectPeriod,totals} from '../public/analytics-core.js';
 
 const event=(time,model,tokens,cost=.01,extra={})=>({time,model,input:tokens,cache:0,write:0,output:0,reasoning:0,cost,tier:'standard',...extra});
 const sessions=[
@@ -16,6 +16,13 @@ test('analytics reports efficiency, coverage and concentration',()=>{
 test('grouping and selection keep only events belonging to the requested model',()=>{
  const groups=grouped(sessions,'model');assert.deepEqual(groups.map(group=>group.name).sort(),['gpt','sonnet']);
  const selected=selectGroup(sessions,'model','gpt');assert.equal(selected.length,1);assert.equal(totals(selected[0].events).tokens,300);
+});
+
+test('period selection keeps only events and sessions from the selected chart bucket',()=>{
+ const selected=selectPeriod(sessions,'2026-09-11','day');
+ assert.equal(selected.length,2);assert.deepEqual(selected.map(session=>session.events.length),[1,1]);
+ assert.equal(totals(selected.flatMap(session=>session.events)).tokens,500);
+ assert.equal(periodKey('2026-09-10T10:00:00Z','month'),'2026-09-01');
 });
 
 test('series separates providers and supports request counts',()=>{

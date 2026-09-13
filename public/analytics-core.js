@@ -61,6 +61,21 @@ export function selectGroup(sessions,kind,key) {
 
 export function selectDimension(sessions,kind,key) {return key==null?sessions:selectGroup(sessions,kind,key);}
 
+export function periodKey(value,period='day') {
+ const date=new Date(value);date.setHours(0,0,0,0);
+ if(period==='week')date.setDate(date.getDate()-((date.getDay()+6)%7));
+ if(period==='month')date.setDate(1);
+ return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+
+export function selectPeriod(sessions=[],key,period='day') {
+ if(!key)return sessions;
+ return sessions.flatMap(session=>{
+  const events=session.events.filter(event=>periodKey(event.time,period)===key);
+  return events.length?[{...session,events,...eventRange(events,session)}]:[];
+ });
+}
+
 export function analytics(sessions=[]) {
  const summary=totals(sessions.flatMap(session=>session.events));
  const sessionRows=grouped(sessions,'sessions'),priced=summary.requests-summary.unknown,inputBase=summary.input+summary.cache+summary.write;
@@ -75,7 +90,7 @@ export function bucketSeries(sessions=[],metric='tokens',maxBuckets=60) {
  const times=events.map(event=>Date.parse(event.time)).filter(Number.isFinite).sort((a,b)=>a-b);if(!times.length)return {period:'day',rows:[]};
  // Period thresholds keep the filled series inside maxBuckets, so no active period is cut off.
  const spanDays=Math.max(1,(times.at(-1)-times[0])/86400000),period=spanDays>420?'month':spanDays>59?'week':'day';
- const keyFor=value=>{const date=new Date(value);date.setHours(0,0,0,0);if(period==='week')date.setDate(date.getDate()-((date.getDay()+6)%7));if(period==='month')date.setDate(1);return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;};
+ const keyFor=value=>periodKey(value,period);
  const map=new Map();
  for(const event of events){const key=keyFor(event.time);if(!map.has(key))map.set(key,{key,codex:0,claude:0});const value=metric==='cost'?(event.cost||0):metric==='requests'?1:tokenCount(event);map.get(key)[event.tool]+=value;}
  // Idle periods become explicit zero buckets: a chart axis must not skip time, and the hover zones
