@@ -14,7 +14,7 @@ export function createDetailViews(options) {
  const cacheRatio=summary=>summary.input+summary.cache+summary.write?summary.cache/(summary.input+summary.cache+summary.write):0;
  const copy=value=>({...value,dimension:value.dimension?{...value.dimension}:null});
 
- function periodLabel(){const period=getScope().period;if(period==='today')return 'Heute';if(period==='7')return 'Letzte 7 Tage';if(period==='30')return 'Letzte 30 Tage';if(period==='custom')return 'Eigener Zeitraum';return 'Gesamter Verlauf';}
+ function periodLabel(){const scope=getScope(),period=scope.period;if(scope.selectedChartLabel)return scope.selectedChartLabel;if(period==='today')return 'Heute';if(period==='7')return 'Letzte 7 Tage';if(period==='30')return 'Letzte 30 Tage';if(period==='custom')return 'Eigener Zeitraum';return 'Gesamter Verlauf';}
  function matchesControls(session,scope,start,end){
   if(scope.tool!=='all'&&session.tool!==scope.tool)return null;if(scope.repository!=='all'&&session.repository!==scope.repository)return null;
   const haystack=[session.title,session.cwd,session.repository,session.branch,session.sessionId,session.subagent?'Subagent':'Hauptsession',...new Set(session.events.map(event=>event.model))].join(' ').toLowerCase();
@@ -22,7 +22,7 @@ export function createDetailViews(options) {
   const events=session.events.filter(event=>{const time=Date.parse(event.time);return time>=start&&time<=end;});
   if(!events.length)return null;return {...session,events,...eventRange(events,session)};
  }
- function previousFiltered(){const scope=getScope(),{start,end}=scope.bounds;if(!start||!Number.isFinite(start)||end<=start)return null;const duration=end-start+1,previousEnd=start-1,previousStart=previousEnd-duration+1;return getData().sessions.map(session=>matchesControls(session,scope,previousStart,previousEnd)).filter(Boolean);}
+ function previousFiltered(){const scope=getScope(),{start,end}=scope.bounds;if(scope.selectedChartLabel||!start||!Number.isFinite(start)||end<=start)return null;const duration=end-start+1,previousEnd=start-1,previousStart=previousEnd-duration+1;return getData().sessions.map(session=>matchesControls(session,scope,previousStart,previousEnd)).filter(Boolean);}
  function delta(current,previous){if(previous==null)return '';if(previous===0)return current===0?'0 %':'Neu';const value=(current-previous)/previous*100;return `${value>0?'+':''}${value.toLocaleString('de-DE',{maximumFractionDigits:0})} % zur Vorperiode`;}
  function setContent(html){content.innerHTML=html;dialog.classList.add('detail-wide');if(!dialog.open)dialog.showModal();}
  function header(title,context,tag=''){

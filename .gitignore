@@ -1,4 +1,5 @@
 .local/
+reviews/
 dist/
 node_modules/
 *.log

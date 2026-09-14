@@ -76,6 +76,10 @@ export function selectPeriod(sessions=[],key,period='day') {
  });
 }
 
+export function chartScopedSessions(sessions=[],view,key,period='day') {
+ return view==='overview'&&key?selectPeriod(sessions,key,period):sessions;
+}
+
 export function analytics(sessions=[]) {
  const summary=totals(sessions.flatMap(session=>session.events));
  const sessionRows=grouped(sessions,'sessions'),priced=summary.requests-summary.unknown,inputBase=summary.input+summary.cache+summary.write;
@@ -85,21 +89,27 @@ export function analytics(sessions=[]) {
 }
 
 export function bucketSeries(sessions=[],metric='tokens',maxBuckets=60) {
- const events=sessions.flatMap(session=>session.events.map(event=>({...event,tool:session.tool})));
+ const events=sessions.flatMap(session=>session.events.map(event=>({...event,tool:session.tool}))).filter(event=>Number.isFinite(Date.parse(event.time)));
  if(!events.length)return {period:'day',rows:[]};
- const times=events.map(event=>Date.parse(event.time)).filter(Number.isFinite).sort((a,b)=>a-b);if(!times.length)return {period:'day',rows:[]};
- // Period thresholds keep the filled series inside maxBuckets, so no active period is cut off.
- const spanDays=Math.max(1,(times.at(-1)-times[0])/86400000),period=spanDays>420?'month':spanDays>59?'week':'day';
+ const times=events.map(event=>Date.parse(event.time)).sort((a,b)=>a-b),limit=Math.max(1,Math.floor(Number(maxBuckets)||60));
+ const bucketCount=period=>{
+  const first=new Date(periodKey(times[0],period)+'T00:00:00'),last=new Date(periodKey(times.at(-1),period)+'T00:00:00');
+  if(period==='month')return (last.getFullYear()-first.getFullYear())*12+last.getMonth()-first.getMonth()+1;
+  const serial=date=>Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())/86400000;
+  return Math.floor((serial(last)-serial(first))/(period==='week'?7:1))+1;
+ };
+ // Choose by touched local calendar buckets, not elapsed milliseconds. This stays correct across
+ // partial weeks/months and daylight-saving transitions.
+ const period=bucketCount('day')<=limit?'day':bucketCount('week')<=limit?'week':'month';
  const keyFor=value=>periodKey(value,period);
  const map=new Map();
  for(const event of events){const key=keyFor(event.time);if(!map.has(key))map.set(key,{key,codex:0,claude:0});const value=metric==='cost'?(event.cost||0):metric==='requests'?1:tokenCount(event);map.get(key)[event.tool]+=value;}
  // Idle periods become explicit zero buckets: a chart axis must not skip time, and the hover zones
  // of the rendered chart have to tile the plot without gaps.
- const keys=[...map.keys()].sort(),last=keys.at(-1),cursor=new Date(keys[0]+'T00:00:00');let rows=[];
- for(let guard=0;guard<1200;guard++) {
-  const key=keyFor(cursor);rows.push(map.get(key)||{key,codex:0,claude:0});if(key>=last)break;
+ const keys=[...map.keys()].sort(),cursor=new Date(keys[0]+'T00:00:00'),count=bucketCount(period),rows=[];
+ for(let index=0;index<count;index++) {
+  const key=keyFor(cursor);rows.push(map.get(key)||{key,codex:0,claude:0});
   if(period==='month')cursor.setMonth(cursor.getMonth()+1);else cursor.setDate(cursor.getDate()+(period==='week'?7:1));
  }
- if(rows.length>maxBuckets)rows=rows.slice(-maxBuckets);
  return {period,rows};
 }
