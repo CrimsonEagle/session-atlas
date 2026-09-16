@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {axisLabel,bucketLabel,seriesChart,tipAttr,tipLabel} from '../public/charts.js';
+import {
+ axisLabel,
+ bucketLabel,
+ compareValues,
+ nextSort,
+ seriesChart,
+ sortableHeader,
+ sortRows,
+ tipAttr,
+ tipLabel,
+} from '../public/charts.js';
 
 const rows=[{key:'2026-09-10',codex:10,claude:0},{key:'2026-09-11',codex:0,claude:0},{key:'2026-09-12',codex:5,claude:5}];
 const format=value=>String(value);
@@ -48,4 +58,27 @@ test('labels and aria text describe the bucket in German',()=>{
  assert.match(axisLabel('2026-09-10','day'),/^10\./);
  assert.equal(tipLabel({title:'Heute',rows:[['Codex','3']],total:['Gesamt','3'],note:'Hinweis'}),'Heute · Codex: 3 · Gesamt: 3 · Hinweis');
  assert.match(tipAttr({title:'a"b'}),/^data-tip="{&quot;title&quot;:&quot;a\\&quot;b&quot;}"$/);
+});
+
+test('table rows sort numbers stably while missing values stay at the bottom',()=>{
+ const values=[
+  {name:'Zehn',value:10},
+  {name:'Zwei',value:2},
+  {name:'Fehlt',value:null},
+  {name:'Noch zwei',value:2},
+ ];
+ const pick=(row,key)=>row[key];
+ assert.deepEqual(sortRows(values,'value','asc',pick).map(row=>row.name),['Zwei','Noch zwei','Zehn','Fehlt']);
+ assert.deepEqual(sortRows(values,'value','desc',pick).map(row=>row.name),['Zehn','Zwei','Noch zwei','Fehlt']);
+ assert.ok(compareValues('Alpha','Beta')<0);
+});
+
+test('sortable table headers expose direction and toggle their active column',()=>{
+ assert.deepEqual(nextSort('activity','desc','tokens','desc'),{key:'tokens',direction:'desc'});
+ assert.deepEqual(nextSort('tokens','desc','tokens','desc'),{key:'tokens',direction:'asc'});
+ const header=sortableHeader('Tokens','tokens',{activeKey:'tokens',direction:'desc',context:'main',numeric:true});
+ assert.match(header,/aria-sort="descending"/);
+ assert.match(header,/data-sort-context="main"/);
+ assert.match(header,/data-sort-key="tokens"/);
+ assert.match(header,/class="sortable numeric sorted"/);
 });
