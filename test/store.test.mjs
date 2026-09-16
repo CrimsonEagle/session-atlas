@@ -38,7 +38,7 @@ test('Version 2 cache entries are safely reimported and migrated',async t=>{
  await fs.writeFile(file,line('one'));await first.scan(settings);
  const saved=JSON.parse(await fs.readFile(cache,'utf8'));saved.version=2;delete saved.files[file].prefixHash;await fs.writeFile(cache,JSON.stringify(saved));
  const restored=new Store(cache);await restored.load();const x=await restored.scan(settings);
- assert.equal(x.sessions[0].events.length,1);assert.match(restored.files[file].prefixHash,/^[a-f0-9]{64}$/);assert.equal(JSON.parse(await fs.readFile(cache,'utf8')).version,5);
+ assert.equal(x.sessions[0].events.length,1);assert.match(restored.files[file].prefixHash,/^[a-f0-9]{64}$/);assert.equal(JSON.parse(await fs.readFile(cache,'utf8')).version,6);
  assert.equal(JSON.parse(await fs.readFile(cache+'.v2.backup','utf8')).version,2);
 });
 test('Parser version changes force a relation reimport even when the log is unchanged',async t=>{
@@ -47,7 +47,7 @@ test('Parser version changes force a relation reimport even when the log is unch
  await fs.writeFile(file,codexLine({type:'session_meta',timestamp:'2026-09-11T10:00:00Z',payload:{id:'child',timestamp:'2026-09-11T10:00:00Z',cwd:'C:/example',parent_thread_id:'parent',thread_source:'subagent'}}));
  const first=new Store(cache);await first.scan(settings);const legacy=JSON.parse(await fs.readFile(cache,'utf8'));legacy.version=3;delete legacy.files[file].parserVersion;delete legacy.files[file].parentId;delete legacy.files[file].relationType;await fs.writeFile(cache,JSON.stringify(legacy));
  const restored=new Store(cache);await restored.load();const result=await restored.scan(settings);
- assert.equal(result.stats.changed,1);assert.equal(result.sessions[0].parentId,'parent');assert.equal(result.sessions[0].relationType,'subagent');assert.equal(JSON.parse(await fs.readFile(cache,'utf8')).version,5);assert.equal(JSON.parse(await fs.readFile(cache+'.v3.backup','utf8')).version,3);
+ assert.equal(result.stats.changed,1);assert.equal(result.sessions[0].parentId,'parent');assert.equal(result.sessions[0].relationType,'subagent');assert.equal(JSON.parse(await fs.readFile(cache,'utf8')).version,6);assert.equal(JSON.parse(await fs.readFile(cache+'.v3.backup','utf8')).version,3);
 });
 test('A valid final JSON record without a newline is counted once',async t=>{
  const {dir,logs,settings}=await fixture(t);const file=path.join(logs,'tail.jsonl'),s=new Store(path.join(dir,'cache.json'));
@@ -148,4 +148,10 @@ test('Overlapping roots are read once and parallel completion preserves duplicat
  assert.equal(result.sessions.length,1);assert.equal(result.sessions[0].events.length,1);
  assert.equal(result.sessions[0].events[0].output,10);
  const unchanged=await store.scan(settings);assert.equal(unchanged.stats.changed,0);assert.equal(unchanged.stats.bytes,0);
+});
+
+test('Context history deduplicates archive copies and never adds usage events',async t=>{
+ const {dir,logs,settings}=await fixture(t),message={type:'assistant',timestamp:'2026-09-11T10:00:00Z',sessionId:'session',cwd:'C:/example',message:{id:'shared',model:'claude-sonnet-4-6',usage:{input_tokens:100,cache_read_input_tokens:50,output_tokens:10,model_context_window:1000}}},compact={type:'system',subtype:'compact_boundary',uuid:'compact',timestamp:'2026-09-11T10:01:00Z',sessionId:'session'};
+ const content=JSON.stringify(message)+'\n'+JSON.stringify(compact)+'\n';await fs.writeFile(path.join(logs,'one.jsonl'),content);await fs.writeFile(path.join(logs,'copy.jsonl'),content);
+ const result=await new Store(path.join(dir,'cache.json')).scan(settings);assert.equal(result.sessions.length,1);assert.equal(result.sessions[0].events.length,1);assert.equal(result.sessions[0].contextTimeline.length,2);assert.deepEqual(result.sessions[0].contextTimeline.map(item=>item.kind),['sample','compaction']);
 });

@@ -71,6 +71,9 @@ dialog{box-shadow:0 25px 100px var(--shadow);overflow:auto}
 .price-format-list li:before{content:counter(price-position);display:grid;place-items:center;width:23px;height:23px;border-radius:6px;background:var(--surface-active);color:var(--blue);font-size:10px;font-weight:700}
 .price-format-list span{color:var(--muted);font-size:11px}
 .price-example{white-space:pre;overflow:auto;line-height:1.7;margin:10px 0 16px}
+.price-history-list{display:grid;gap:8px;margin-top:14px}.price-history-list>div{display:grid;gap:3px;padding:10px 12px;border:1px solid var(--line-soft);border-radius:8px;background:var(--surface-soft)}.price-history-list strong{font-size:11px}.price-history-list span,.price-history-list code{color:var(--muted);font-size:9px}.backup-actions{display:flex;flex-wrap:wrap;gap:9px;margin:16px 0 10px}.backup-actions label.button{cursor:pointer}
+.restore-mappings{display:grid;gap:10px;margin:12px 0 18px}.restore-mappings label{display:grid;gap:5px}.restore-mappings label span{overflow-wrap:anywhere;color:var(--muted);font-size:10px}.restore-mappings input{width:100%}
+.price-compare{margin-top:14px}.price-compare>label{display:grid;gap:5px;margin-top:10px}.price-compare-dates{display:grid;grid-template-columns:1fr 1fr;gap:10px}.price-compare-dates label{display:grid;gap:5px}.price-compare .button{margin-top:12px}
 .format-note{margin:0}
 .chart-wrap{position:relative}
 .chart-axis{stroke:var(--line);stroke-width:1.2}

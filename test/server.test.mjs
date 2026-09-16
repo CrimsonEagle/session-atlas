@@ -26,6 +26,10 @@ test('HTTP API is local, rejects foreign origins/mutations, validates settings a
  assert.equal((await post('/api/settings',{...bootstrap.settings,intervalSeconds:10})).status,200);
  const result=await(await post('/api/refresh',{})).json();assert.deepEqual(result.sessions,[]);assert.equal(result.stats.scanCount,1);
  const snapshot=await(await fetch(base+'/api/snapshot')).json();assert.equal(snapshot.stats.scanCount,1);
+ const backupResponse=await post('/api/backup/export',{});assert.equal(backupResponse.status,200);assert.match(backupResponse.headers.get('content-type'),/application\/gzip/);const backup=await backupResponse.arrayBuffer();assert.ok(backup.byteLength>50);
+ const badPreview=await fetch(base+'/api/backup/preview',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-Atlas-Token':bootstrap.token},body:Buffer.from('damaged')});assert.equal(badPreview.status,400);
+ const previewResponse=await fetch(base+'/api/backup/preview',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-Atlas-Token':bootstrap.token},body:backup});assert.equal(previewResponse.status,200);const preview=await previewResponse.json();assert.equal(preview.sessionCount,0);assert.ok(preview.categories.some(item=>item.file==='usage-cache.json'));
+ const restored=await(await post('/api/backup/restore',{restoreId:preview.restoreId})).json();assert.equal(restored.ok,true);assert.deepEqual(restored.snapshot.sessions,[]);assert.ok(restored.fallbackFile.includes('before-restore-'));
  assert.equal((await fetch(base+'/.local/settings.json')).status,404);
  assert.equal((await post('/api/shutdown',{})).status,200);await once(child,'exit');
 });

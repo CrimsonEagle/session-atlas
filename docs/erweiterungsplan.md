@@ -2,7 +2,7 @@
 
 Stand: 15. September 2026. Grundlage: aktueller Repository-Stand, README, Parser, Store, Preisverwaltung, Server und Oberfläche.
 
-Status: Planung. Dieses Dokument beschreibt zehn Erweiterungen; die Funktionen sind noch nicht implementiert. Die vorgeschlagenen Dateinamen und Schnittstellen sind Arbeitsvorschläge.
+Status: E1, E2, E3, E5, E6, E7 und E8 sind umgesetzt; die übrigen Abschnitte bleiben Planung. Die vorgeschlagenen Dateinamen und Schnittstellen der noch offenen Erweiterungen sind Arbeitsvorschläge.
 
 ## 1. Ziel und Leitlinien
 

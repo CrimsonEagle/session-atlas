@@ -44,6 +44,12 @@ test('Claude streaming chunks merge usage and retain one-hour cache writes',()=>
  ingest(s,x);ingest(s,{...x,message:{...x.message,usage:{...x.message.usage,output_tokens:30}}});const e=sessionEvents(s)[0];
  assert.equal(sessionEvents(s).length,1);assert.equal(e.output,30);assert.equal(e.input,5);assert.equal(e.writeHour,15);
 });
+test('Context samples track explicit windows, model changes and compaction markers without affecting usage',()=>{
+ const codex=newState('codex','test.jsonl');ingest(codex,{timestamp:time,type:'turn_context',payload:{model:'gpt-6-astra'}});ingest(codex,{timestamp:time,type:'event_msg',payload:{type:'token_count',turn_id:'one',info:{model_context_window:200000,last_token_usage:{input_tokens:90000,output_tokens:10000},total_token_usage:{input_tokens:90000,output_tokens:10000}}}});ingest(codex,{timestamp:'2026-09-11T10:01:00Z',type:'event_msg',payload:{type:'context_compacted'}});
+ assert.equal(Object.values(codex.contextSamples)[0].usedTokens,100000);assert.equal(Object.values(codex.contextSamples)[0].windowTokens,200000);assert.equal(Object.values(codex.contextMarkers)[0].kind,'compaction');assert.equal(sessionEvents(codex).length,1);
+ const claude=newState('claude','test.jsonl'),message={timestamp:time,type:'assistant',sessionId:'session',message:{id:'one',model:'claude-sonnet-4-6',usage:{input_tokens:100,cache_read_input_tokens:200,cache_creation_input_tokens:50,output_tokens:10,model_context_window:1000}}};ingest(claude,message);ingest(claude,{timestamp:'2026-09-11T10:02:00Z',type:'system',subtype:'compact_boundary',uuid:'compact'});
+ assert.equal(Object.values(claude.contextSamples)[0].usedTokens,350);assert.equal(Object.values(claude.contextSamples)[0].windowTokens,1000);assert.equal(Object.values(claude.contextMarkers).length,1);assert.equal(sessionEvents(claude).length,1);
+});
 test('Limits update even when the token snapshot is unchanged',()=>{
  const s=newState('codex','test.jsonl');ingest(s,event(usage(100)));const x=event(usage(100));x.payload.rate_limits={limit_id:'codex',primary:{used_percent:34,window_minutes:300}};ingest(s,x);
  assert.equal(s.limits.codex.primary.used_percent,34);assert.equal(sessionEvents(s).length,1);
