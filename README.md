@@ -23,9 +23,13 @@ npm start
 ## Funktionen
 
 - Live-Übersicht, gestapelte Verlaufsdiagramme für Tokens/Kosten, Tages-/Wochen-/Monatsaggregation.
-- Sessions, Repositories, Arbeitsordner, KI-Tools und Modelle als Gruppierungen; Suche und kombinierte Filter; eigene Datumsbereiche.
+- Direkter Vergleich zweier Zeiträume mit Kennzahlen, relativer Zeitachse und Beiträgen nach Projekt, Modell oder KI-Tool. Verfügbar sind die gleich lange Vorperiode, vorige Kalenderwoche, voriger Kalendermonat und ein eigener Vergleichszeitraum.
+- Aktivitätskalender für die letzten zwölf Monate oder ein Kalenderjahr, wahlweise nach Tokens, API-Gegenwert oder Modellantworten. Ein ausgewählter Tag grenzt Tabelle und Details auf denselben lokalen Kalendertag ein.
+- Aufgabenansicht für Codex-Hauptsessions und explizit zugeordnete Subagents beziehungsweise Prüf-Agents. Aufklappbare Bäume unterscheiden Eigenverbrauch und Verbrauch einschließlich untergeordneter Agents; unsichere oder fehlende Beziehungen bleiben sichtbar statt geschätzt zu werden.
+- Sessions, Repositories, Arbeitsordner, KI-Tools und Modelle als Gruppierungen; Suche sowie kombinierte Tool-, Repository-, Modell- und Datumsfilter.
 - Sessiondetails mit Modellantworten, Branch, Arbeitsordner, Kontextstand, Input-/Output-/Cache-/Reasoning-Tokens.
 - 5-Stunden-/Wochenlimits für beide Tools, inklusive Plan, Messzeitpunkt und Reset: Codex aus den letzten protokollierten `rate_limits`, Claude Code aus `cachedUsageUtilization` in `.claude.json` und optional aus der Statusline-Bridge. Angezeigt wird jeweils der jüngere Messwert samt Quelle. Abgelaufene Messwerte erscheinen als unbekannt, nicht als 0 %.
+- Persistenter Limitverlauf mit sichtbaren Resetgrenzen und Quellen sowie konfigurierbaren Schwellenhinweisen. Voreinstellung: 80 % und 95 %, höchstens einmal je Schwelle und Resetfenster; Aufbewahrung standardmäßig 90 Tage.
 - Rollierende Kosten der letzten 5 Stunden / 7 Tage für beide Tools. Diese sind **kein identisches Abrechnungsfenster** und kein Ersatz für prozentuale Abolimits.
 - Manuelles Aktualisieren und automatischer Scan (Standard 30 s, einstellbar 10–3600 s).
 - Fokusverlust, anderer Browsertab oder minimiertes Fenster stoppen weitere automatische Scans. Bei Rückkehr sofortige Aktualisierung. Ein schon laufender Scan darf zu Ende laufen. Ein zusätzlich geöffnetes, fokussiertes App-Fenster kann weiterhin Scans auslösen. Der Server hat keinen Hintergrund-Polling-Timer und keine Dateiwatcher.

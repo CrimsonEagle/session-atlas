@@ -15,7 +15,8 @@ await loadPriceCache(dataDir);
 const port=Number(process.env.ATLAS_PORT||4317);
 const origin=`http://127.0.0.1:${port}`;
 const token=randomBytes(32).toString('hex');
-const defaults={intervalSeconds:30,claudeRoots:[path.join(process.env.CLAUDE_CONFIG_DIR||path.join(os.homedir(),'.claude'),'projects')],codexRoots:[path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'sessions'),path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'archived_sessions')],prices:{}};
+const defaultThresholds={codex:{300:[80,95],10080:[80,95]},claude:{300:[80,95],10080:[80,95]}};
+const defaults={intervalSeconds:30,limitRetentionDays:90,limitThresholds:defaultThresholds,claudeRoots:[path.join(process.env.CLAUDE_CONFIG_DIR||path.join(os.homedir(),'.claude'),'projects')],codexRoots:[path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'sessions'),path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'archived_sessions')],prices:{}};
 let settings={...defaults};
 try {settings={...defaults,...JSON.parse(await fs.readFile(path.join(dataDir,'settings.json'),'utf8'))};}catch{}
 const store=new Store(path.join(dataDir,'usage-cache.json'));await store.load();
@@ -24,9 +25,11 @@ function validateSettings(x) {
  for(const k of ['claudeRoots','codexRoots'])if(!Array.isArray(x[k])||x[k].length>20||x[k].some(p=>typeof p!=='string'||!path.isAbsolute(p)||p.length>2000))throw Error('Bitte gültige absolute Ordnerpfade eintragen.');
  if(!x.prices||typeof x.prices!=='object'||Array.isArray(x.prices))throw Error('Preise müssen ein JSON-Objekt sein.');
  for(const [model,r] of Object.entries(x.prices))if(model.length>120||!Array.isArray(r)||r.length<3||r.length>5||r.some(v=>!Number.isFinite(v)||v<0||v>100000))throw Error('Preise: je Modell 3 bis 5 nichtnegative Zahlen.');
- return {intervalSeconds:x.intervalSeconds,claudeRoots:x.claudeRoots.map(p=>path.resolve(p)),codexRoots:x.codexRoots.map(p=>path.resolve(p)),prices:x.prices};
+ if(!Number.isInteger(x.limitRetentionDays)||x.limitRetentionDays<30||x.limitRetentionDays>3650)throw Error('Limitverlauf: 30 bis 3650 Tage Aufbewahrung.');
+ const limitThresholds={};for(const tool of ['codex','claude']){limitThresholds[tool]={};for(const minutes of [300,10080]){const values=x.limitThresholds?.[tool]?.[minutes];if(!Array.isArray(values)||values.length<1||values.length>5||values.some(value=>!Number.isFinite(value)||value<=0||value>100))throw Error('Limitschwellen: 1 bis 5 Prozentwerte zwischen 1 und 100.');limitThresholds[tool][minutes]=[...new Set(values)].sort((a,b)=>a-b);}}
+ return {intervalSeconds:x.intervalSeconds,limitRetentionDays:x.limitRetentionDays,limitThresholds,claudeRoots:x.claudeRoots.map(p=>path.resolve(p)),codexRoots:x.codexRoots.map(p=>path.resolve(p)),prices:x.prices};
 }
-const staticFiles={'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript; charset=utf-8'],'/analytics-core.js':['analytics-core.js','text/javascript; charset=utf-8'],'/charts.js':['charts.js','text/javascript; charset=utf-8'],'/details.js':['details.js','text/javascript; charset=utf-8'],'/polling.js':['polling.js','text/javascript; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8'],'/details.css':['details.css','text/css; charset=utf-8'],'/favicon.svg':['favicon.svg','image/svg+xml']};
+const staticFiles={'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript; charset=utf-8'],'/activity-calendar.js':['activity-calendar.js','text/javascript; charset=utf-8'],'/analytics-core.js':['analytics-core.js','text/javascript; charset=utf-8'],'/charts.js':['charts.js','text/javascript; charset=utf-8'],'/comparison.js':['comparison.js','text/javascript; charset=utf-8'],'/details.js':['details.js','text/javascript; charset=utf-8'],'/limit-history.js':['limit-history.js','text/javascript; charset=utf-8'],'/polling.js':['polling.js','text/javascript; charset=utf-8'],'/tasks.js':['tasks.js','text/javascript; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8'],'/details.css':['details.css','text/css; charset=utf-8'],'/favicon.svg':['favicon.svg','image/svg+xml']};
 let mutating=false;
 const server=http.createServer(async(req,res)=>{
  res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Cache-Control','no-store');res.setHeader('Referrer-Policy','no-referrer');
@@ -47,7 +50,7 @@ const server=http.createServer(async(req,res)=>{
    if(req.headers['x-atlas-token']!==token)return json(403,{error:'Sitzung abgelaufen. Bitte Seite neu laden.'});
    let body='';for await(const chunk of req){body+=chunk;if(body.length>64000)return json(413,{error:'Anfrage zu groß.'});}
    let input={};try {input=JSON.parse(body||'{}');}catch{return json(400,{error:'Ungültiges JSON.'});}
-   if(url.pathname==='/api/refresh')return json(200,await store.scan(settings));
+   if(url.pathname==='/api/refresh'){const snapshot=await store.scan(settings);return json(200,{...snapshot,limitAlerts:store.takeLimitAlerts()});}
    if(url.pathname==='/api/prices/sync') {
     const result=await syncPrices(dataDir);
     return json(200,{...result,rates:{...rates,...remotePrices()}});

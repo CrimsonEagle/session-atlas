@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newState,ingest,sessionEvents} from '../lib/parser.mjs';
+import {PARSER_VERSION,newState,ingest,sessionEvents} from '../lib/parser.mjs';
 import {costFor} from '../lib/pricing.mjs';
 const time='2026-09-11T10:00:00.000Z';
 const event=(usage,total=usage,t=time)=>({timestamp:t,type:'event_msg',payload:{type:'token_count',info:{last_token_usage:usage,total_token_usage:total}}});
@@ -27,6 +27,18 @@ test('Inherited history before session creation only establishes a cumulative ba
  ingest(s,event(usage(1000),usage(1000),'2026-09-11T09:59:00Z'));ingest(s,event(usage(40),usage(1040,20),'2026-09-11T10:01:00Z'));
  assert.equal(sessionEvents(s).length,1);assert.equal(sessionEvents(s)[0].input,40);assert.equal(s.subagent,true);
 });
+test('Codex session metadata preserves only explicit task relationships',()=>{
+ const child=newState('codex','child.jsonl');ingest(child,{timestamp:time,type:'session_meta',payload:{id:'child',parent_thread_id:'parent',thread_source:'subagent'}});
+ assert.equal(child.parserVersion,PARSER_VERSION);assert.equal(child.parentId,'parent');assert.equal(child.relationType,'subagent');assert.equal(child.relationEvidence,'session_meta.parent_thread_id');assert.equal(child.subagent,true);
+ const review=newState('codex','review.jsonl');ingest(review,{timestamp:time,type:'session_meta',payload:{id:'review',parent_thread_id:'parent',thread_source:'guardian_review'}});
+ assert.equal(review.relationType,'guardian_review');assert.equal(review.subagent,true);
+ const fork=newState('codex','fork.jsonl');ingest(fork,{timestamp:time,type:'session_meta',payload:{id:'fork',forked_from_id:'source',thread_source:'user'}});
+ assert.equal(fork.parentId,'');assert.equal(fork.forkedFromId,'source');assert.equal(fork.relationType,'fork');assert.equal(fork.subagent,false);
+});
+test('Claude message parentUuid is not inferred as a session relationship',()=>{
+ const s=newState('claude','test.jsonl');ingest(s,{timestamp:time,type:'assistant',sessionId:'session',parentUuid:'message-parent',message:{id:'message',model:'claude-sonnet-4-6',usage:{input_tokens:1,output_tokens:1}}});
+ assert.equal(s.parentId,'');assert.equal(s.relationType,'');assert.equal(s.forkedFromId,'');
+});
 test('Claude streaming chunks merge usage and retain one-hour cache writes',()=>{
  const s=newState('claude','test.jsonl');const x={timestamp:time,type:'assistant',sessionId:'claude-session',message:{id:'m1',model:'claude-opus-4-8',usage:{input_tokens:5,output_tokens:10,cache_read_input_tokens:100,cache_creation_input_tokens:20,cache_creation:{ephemeral_1h_input_tokens:15}}}};
  ingest(s,x);ingest(s,{...x,message:{...x.message,usage:{...x.message.usage,output_tokens:30}}});const e=sessionEvents(s)[0];
@@ -35,6 +47,10 @@ test('Claude streaming chunks merge usage and retain one-hour cache writes',()=>
 test('Limits update even when the token snapshot is unchanged',()=>{
  const s=newState('codex','test.jsonl');ingest(s,event(usage(100)));const x=event(usage(100));x.payload.rate_limits={limit_id:'codex',primary:{used_percent:34,window_minutes:300}};ingest(s,x);
  assert.equal(s.limits.codex.primary.used_percent,34);assert.equal(sessionEvents(s).length,1);
+});
+test('Codex keeps distinct historical limit observations for E3',()=>{
+ const s=newState('codex','test.jsonl'),one=event(usage(100)),two=event(usage(100),usage(100),'2026-09-11T10:05:00Z');one.payload.rate_limits={limit_id:'codex',primary:{used_percent:20,window_minutes:300}};two.payload.rate_limits={limit_id:'codex',primary:{used_percent:30,window_minutes:300}};ingest(s,one);ingest(s,two);
+ assert.equal(Object.keys(s.limitObservations).length,2);assert.deepEqual(Object.values(s.limitObservations).map(limit=>limit.primary.used_percent),[20,30]);
 });
 test('Prices account for cache TTL and do not double charge reasoning',()=>{
  const e={model:'claude-opus-4-8',input:1e6,cache:1e6,write:2e6,writeHour:1e6,output:1e6,reasoning:500000,tier:'standard'};

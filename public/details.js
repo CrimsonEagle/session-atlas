@@ -1,4 +1,4 @@
-import {analytics,bucketSeries,eventRange,grouped,selectDimension,selectGroup,tokenCount,totals} from './analytics-core.js';
+import {analytics,bucketSeries,comparisonRange,eventRange,filterSessions,grouped,selectDimension,selectGroup,tokenCount,totals} from './analytics-core.js';
 import {attachTooltips,axisLabel,seriesChart,tipAttr} from './charts.js';
 
 export function createDetailViews(options) {
@@ -14,15 +14,8 @@ export function createDetailViews(options) {
  const cacheRatio=summary=>summary.input+summary.cache+summary.write?summary.cache/(summary.input+summary.cache+summary.write):0;
  const copy=value=>({...value,dimension:value.dimension?{...value.dimension}:null});
 
- function periodLabel(){const scope=getScope(),period=scope.period;if(scope.selectedChartLabel)return scope.selectedChartLabel;if(period==='today')return 'Heute';if(period==='7')return 'Letzte 7 Tage';if(period==='30')return 'Letzte 30 Tage';if(period==='custom')return 'Eigener Zeitraum';return 'Gesamter Verlauf';}
- function matchesControls(session,scope,start,end){
-  if(scope.tool!=='all'&&session.tool!==scope.tool)return null;if(scope.repository!=='all'&&session.repository!==scope.repository)return null;
-  const haystack=[session.title,session.cwd,session.repository,session.branch,session.sessionId,session.subagent?'Subagent':'Hauptsession',...new Set(session.events.map(event=>event.model))].join(' ').toLowerCase();
-  if(scope.query&&!haystack.includes(scope.query))return null;
-  const events=session.events.filter(event=>{const time=Date.parse(event.time);return time>=start&&time<=end;});
-  if(!events.length)return null;return {...session,events,...eventRange(events,session)};
- }
- function previousFiltered(){const scope=getScope(),{start,end}=scope.bounds;if(scope.selectedChartLabel||!start||!Number.isFinite(start)||end<=start)return null;const duration=end-start+1,previousEnd=start-1,previousStart=previousEnd-duration+1;return getData().sessions.map(session=>matchesControls(session,scope,previousStart,previousEnd)).filter(Boolean);}
+ function periodLabel(){const scope=getScope(),period=scope.period;if(scope.selectedChartLabel)return scope.selectedChartLabel;if(period==='today')return 'Heute';if(period==='7')return 'Letzte 7 Tage';if(period==='30')return 'Letzte 30 Tage';if(period==='12months')return 'Letzte 12 Monate';if(period==='week')return 'Diese Woche';if(period==='month')return 'Dieser Monat';if(period==='custom')return 'Eigener Zeitraum';return 'Gesamter Verlauf';}
+ function previousFiltered(){const scope=getScope();if(scope.selectedChartLabel)return null;const previous=comparisonRange(scope.bounds,'previous');return previous?filterSessions(getData().sessions,scope,previous):null;}
  function delta(current,previous){if(previous==null)return '';if(previous===0)return current===0?'0 %':'Neu';const value=(current-previous)/previous*100;return `${value>0?'+':''}${value.toLocaleString('de-DE',{maximumFractionDigits:0})} % zur Vorperiode`;}
  function setContent(html){content.innerHTML=html;dialog.classList.add('detail-wide');if(!dialog.open)dialog.showModal();}
  function header(title,context,tag=''){
@@ -34,7 +27,7 @@ export function createDetailViews(options) {
    ['API-Schätzung',costText(summary),delta(summary.cost,p?.cost),`${percent(summary.priceCoverage)} mit Preis`],
    [sessionMode?'Aktive Tage':'Sessions',num(sessionMode?summary.activeDays:summary.sessionCount),delta(sessionMode?summary.activeDays:summary.sessionCount,sessionMode?p?.activeDays:p?.sessionCount),sessionMode?'Tage mit Modellantworten':`Ø ${compact(summary.averagePerSession)} Tokens`],
    ['Modellantworten',num(summary.requests),delta(summary.requests,p?.requests),`${compact(summary.output)} Output-Tokens`],
-   ['Cache-Anteil',percent(summary.cacheRatio),p?`${delta(summary.cacheRatio,p.cacheRatio)}`:'',`${compact(summary.cache)} gelesene Tokens`]
+    ['Cache-Anteil',percent(summary.cacheRatio),p?`${(summary.cacheRatio-p.cacheRatio)*100>=0?'+':''}${((summary.cacheRatio-p.cacheRatio)*100).toLocaleString('de-DE',{maximumFractionDigits:1})} Prozentpunkte`:'',`${compact(summary.cache)} gelesene Tokens`]
   ];
   return `<section class="detail-kpis" aria-label="Kennzahlen">${items.map(([label,value,change,note])=>`<div class="detail-kpi"><span>${esc(label)}</span><strong>${esc(value)}</strong>${change?`<small>${esc(change)}</small>`:''}<small>${esc(note)}</small></div>`).join('')}</section>`;
  }

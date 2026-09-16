@@ -1,5 +1,68 @@
 export const tokenCount=event=>(event?.input||0)+(event?.cache||0)+(event?.write||0)+(event?.output||0);
 
+const validTime=value=>{const time=value instanceof Date?value.getTime():Date.parse(value);return Number.isFinite(time)?time:null;};
+const localMidnight=value=>{const date=new Date(value);date.setHours(0,0,0,0);return date;};
+const localEndOfDay=value=>{const date=localMidnight(value);date.setDate(date.getDate()+1);return date.getTime()-1;};
+const shiftDays=(value,days)=>{const date=new Date(value);date.setDate(date.getDate()+days);return date.getTime();};
+const startOfWeek=value=>{const date=localMidnight(value);date.setDate(date.getDate()-((date.getDay()+6)%7));return date;};
+const startOfMonth=value=>{const date=localMidnight(value);date.setDate(1);return date;};
+
+export function calendarKey(value) {
+ const date=new Date(value);
+ if(!Number.isFinite(date.getTime()))return null;
+ return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+
+export function rangeForPeriod(period='30',{now=Date.now(),from='',to=''}={}) {
+ const current=new Date(now);let start=0,end=current.getTime();
+ if(period==='today')start=localMidnight(current).getTime();
+ else if(['7','30'].includes(String(period))){const date=localMidnight(current);date.setDate(date.getDate()-Number(period)+1);start=date.getTime();}
+ else if(period==='12months'){const date=localMidnight(current);date.setFullYear(date.getFullYear()-1);date.setDate(date.getDate()+1);start=date.getTime();}
+ else if(period==='week')start=startOfWeek(current).getTime();
+ else if(period==='month')start=startOfMonth(current).getTime();
+ else if(period==='custom'){
+  const parsedFrom=validTime(from?`${from}T00:00:00`:null),parsedTo=validTime(to?`${to}T00:00:00`:null);
+  if(parsedFrom!==null)start=parsedFrom;if(parsedTo!==null)end=localEndOfDay(parsedTo);
+ }
+ return {start,end,period};
+}
+
+export function comparisonRange(current,mode='previous',{from='',to=''}={}) {
+ if(!current||!Number.isFinite(current.start)||!Number.isFinite(current.end)||current.start<=0||current.end<current.start)return null;
+ if(mode==='previous'&&current.period==='month')return comparisonRange(current,'month');
+ if(mode==='custom'){
+  const start=validTime(from?`${from}T00:00:00`:null),day=validTime(to?`${to}T00:00:00`:null);
+  return start===null||day===null||day<start?null:{start,end:localEndOfDay(day),period:'custom'};
+ }
+ if(mode==='week'){
+  const thisWeek=startOfWeek(current.end),start=shiftDays(thisWeek,-7);
+  const matching=current.period==='week';return {start,end:matching?shiftDays(current.end,-7):shiftDays(thisWeek,-1),period:'week'};
+ }
+ if(mode==='month'){
+  const thisMonth=startOfMonth(current.end),previous=new Date(thisMonth);previous.setMonth(previous.getMonth()-1);
+  if(current.period!=='month')return {start:previous.getTime(),end:thisMonth.getTime()-1,period:'month'};
+  const elapsedDay=new Date(current.end).getDate(),elapsedTime=new Date(current.end),lastDay=new Date(thisMonth);lastDay.setDate(0);
+  const end=new Date(previous);end.setDate(Math.min(elapsedDay,lastDay.getDate()));end.setHours(elapsedTime.getHours(),elapsedTime.getMinutes(),elapsedTime.getSeconds(),elapsedTime.getMilliseconds());
+  return {start:previous.getTime(),end:end.getTime(),period:'month'};
+ }
+ const days=Math.round((Date.UTC(new Date(current.end).getFullYear(),new Date(current.end).getMonth(),new Date(current.end).getDate())-Date.UTC(new Date(current.start).getFullYear(),new Date(current.start).getMonth(),new Date(current.start).getDate()))/86400000)+1;
+ return {start:shiftDays(current.start,-days),end:shiftDays(current.end,-days),period:current.period};
+}
+
+export function filterSessions(sessions=[],scope={},range=scope.bounds) {
+ const start=range?.start??0,end=range?.end??Date.now(),tool=scope.tool||'all',repository=scope.repository||'all',model=scope.model||'all',query=String(scope.query||'').trim().toLowerCase();
+ return sessions.flatMap(session=>{
+  if(tool!=='all'&&session.tool!==tool)return [];
+  if(repository!=='all'&&session.repository!==repository)return [];
+  const haystack=[session.title,session.cwd,session.repository,session.branch||'Ohne Branch',session.sessionId,session.subagent?'Subagent':'Hauptsession',...new Set((session.events||[]).map(event=>event.model))].join(' ').toLowerCase();
+  if(query&&!haystack.includes(query))return [];
+  const events=(session.events||[]).filter(event=>{const time=validTime(event.time);return time!==null&&time>=start&&time<=end&&(model==='all'||event.model===model);});
+  if(events.length)return [{...session,events,...eventRange(events,session)}];
+  if(model!=='all'||(session.events||[]).length)return [];
+  const activity=validTime(session.lastActivity);return activity!==null&&activity>=start&&activity<=end?[{...session,events:[]}]:[];
+ });
+}
+
 export function totals(events=[]) {
  return events.reduce((summary,event)=>{
   for(const key of ['input','cache','write','output','reasoning'])summary[key]+=event?.[key]||0;
@@ -83,7 +146,7 @@ export function chartScopedSessions(sessions=[],view,key,period='day') {
 export function analytics(sessions=[]) {
  const summary=totals(sessions.flatMap(session=>session.events));
  const sessionRows=grouped(sessions,'sessions'),priced=summary.requests-summary.unknown,inputBase=summary.input+summary.cache+summary.write;
- const activeDays=new Set(sessions.flatMap(session=>session.events.map(event=>event.time?.slice(0,10))).filter(Boolean)).size;
+ const activeDays=new Set(sessions.flatMap(session=>session.events.map(event=>calendarKey(event.time))).filter(Boolean)).size;
  const top3=sessionRows.map(session=>session.tokens).sort((a,b)=>b-a).slice(0,3).reduce((sum,value)=>sum+value,0);
  return {...summary,sessionCount:sessions.length,activeDays,cacheRatio:inputBase?summary.cache/inputBase:0,priceCoverage:summary.requests?priced/summary.requests:0,averagePerSession:sessions.length?summary.tokens/sessions.length:0,averagePerRequest:summary.requests?summary.tokens/summary.requests:0,top3Share:summary.tokens?top3/summary.tokens:0};
 }
@@ -112,4 +175,32 @@ export function bucketSeries(sessions=[],metric='tokens',maxBuckets=60) {
   if(period==='month')cursor.setMonth(cursor.getMonth()+1);else cursor.setDate(cursor.getDate()+(period==='week'?7:1));
  }
  return {period,rows};
+}
+
+export function metricValue(summary,metric='tokens') {
+ if(metric==='cost')return summary.cost;
+ if(metric==='requests')return summary.requests;
+ if(metric==='sessions')return summary.sessionCount??0;
+ if(metric==='cacheRatio')return summary.cacheRatio??0;
+ return summary.tokens;
+}
+
+export function comparisonRows(currentSessions=[],previousSessions=[],kind='repository',metric='tokens') {
+ const current=new Map(grouped(currentSessions,kind).map(row=>[row.name,row]));
+ const previous=new Map(grouped(previousSessions,kind).map(row=>[row.name,row]));
+ return [...new Set([...current.keys(),...previous.keys()])].map(name=>{
+  const currentSummary=current.get(name)||totals([]),previousSummary=previous.get(name)||totals([]);
+  const currentValue=metricValue({...currentSummary,sessionCount:currentSummary.sessions?.size||0},metric);
+  const previousValue=metricValue({...previousSummary,sessionCount:previousSummary.sessions?.size||0},metric);
+  return {name,current:currentValue,previous:previousValue,delta:currentValue-previousValue,currentSummary,previousSummary};
+ }).sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta)||String(a.name).localeCompare(String(b.name)));
+}
+
+export function relativeSeries(sessions=[],range,metric='tokens') {
+ if(!range||range.end<range.start)return [];
+ const byDay=new Map();
+ for(const session of sessions)for(const event of session.events||[]){const key=calendarKey(event.time);if(!key)continue;const value=metric==='cost'?(event.cost||0):metric==='requests'?1:tokenCount(event);byDay.set(key,(byDay.get(key)||0)+value);}
+ const result=[],cursor=localMidnight(range.start),last=localMidnight(range.end);let index=0;
+ while(cursor<=last&&index<370){const key=calendarKey(cursor);result.push({index,key,value:byDay.get(key)||0});cursor.setDate(cursor.getDate()+1);index++;}
+ return result;
 }
