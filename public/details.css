@@ -313,8 +313,8 @@ dialog:not(.detail-wide) .detail-body>.metrics .metric:nth-child(3){background:l
 dialog:not(.detail-wide) .detail-body>.metrics .metric-value{color:var(--detail-indigo)}
 dialog:not(.detail-wide) .detail-body>.metrics .metric:nth-child(2) .metric-value{color:var(--detail-coral)}
 dialog:not(.detail-wide) .detail-body>.metrics .metric:nth-child(3) .metric-value{color:var(--detail-cyan)}
-.limit-history-legend .window-300{background:var(--detail-indigo)!important;fill:var(--detail-indigo)!important;stroke:var(--detail-indigo)!important}
-.limit-history-legend .window-10080{background:var(--detail-violet)!important;fill:var(--detail-violet)!important;stroke:var(--detail-violet)!important}
+.limit-history-legend .window-300{border-color:var(--detail-indigo)!important;background:color-mix(in srgb,var(--detail-indigo) 16%,transparent)!important}
+.limit-history-legend .window-10080{border-color:var(--detail-violet)!important;background:color-mix(in srgb,var(--detail-violet) 16%,transparent)!important}
 
 @keyframes detail-enter{from{opacity:0;transform:translateY(9px) scale(.985)}to{opacity:1;transform:none}}
 @media(max-width:900px){

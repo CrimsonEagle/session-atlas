@@ -30,5 +30,14 @@ test('history view separates reset windows and reports sources',()=>{
   {id:'2',tool:'codex',windowMinutes:300,resetsAt:'2026-09-15T15:00:00Z',usedPercent:40,sourceObservedAt:'2026-09-15T11:00:00Z',source:'session-log'},
   {id:'3',tool:'codex',windowMinutes:300,resetsAt:'2026-09-16T15:00:00Z',usedPercent:10,sourceObservedAt:'2026-09-15T12:00:00Z',source:'session-log'},
   {id:'4',tool:'codex',windowMinutes:300,resetsAt:'2026-09-16T15:00:00Z',usedPercent:30,sourceObservedAt:'2026-09-15T13:00:00Z',source:'session-log'}];
- const html=limitHistoryView({history,tool:'codex',esc:String,date:String});assert.equal((html.match(/<polyline/g)||[]).length,2);assert.match(html,/Linien werden an Resetgrenzen getrennt/);assert.match(html,/Session-Log/);
+ const html=limitHistoryView({history,tool:'codex',now:now+2*60*60*1000,esc:String,date:String});assert.equal((html.match(/class="limit-history-area"/g)||[]).length,2);assert.equal((html.match(/class="limit-history-line"/g)||[]).length,2);assert.doesNotMatch(html,/<circle/);assert.match(html,/Flächen enden an Resetgrenzen/);assert.match(html,/Session-Log/);assert.match(html,/<option value="30" selected>/);
+});
+
+test('history view limits chart and table to the selected date range',()=>{
+ const history=[
+  {id:'old',tool:'codex',windowMinutes:300,resetsAt:'2026-07-01T15:00:00Z',usedPercent:90,sourceObservedAt:'2026-07-01T10:00:00Z',source:'session-log'},
+  {id:'new-1',tool:'codex',windowMinutes:300,resetsAt:'2026-09-15T15:00:00Z',usedPercent:20,sourceObservedAt:'2026-09-15T10:00:00Z',source:'session-log'},
+  {id:'new-2',tool:'codex',windowMinutes:300,resetsAt:'2026-09-15T15:00:00Z',usedPercent:40,sourceObservedAt:'2026-09-15T11:00:00Z',source:'statusline'}];
+ const recent=limitHistoryView({history,tool:'codex',period:'30',now,esc:String,date:String});assert.doesNotMatch(recent,/90 %/);assert.match(recent,/2 von 3 Messpunkten/);
+ const all=limitHistoryView({history,tool:'codex',period:'all',now,esc:String,date:String});assert.match(all,/90 %/);assert.match(all,/3 von 3 Messpunkten/);
 });
