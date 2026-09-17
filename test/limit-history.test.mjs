@@ -24,6 +24,12 @@ test('retention removes old points and configured thresholds are honored',()=>{
  const result=updateLimitHistory([limit(75)], [old], {}, {now,retentionDays:30,thresholds:{codex:{300:[70,90]}}});assert.equal(result.history.length,1);assert.equal(result.alerts[0].threshold,70);
 });
 
+test('indexed incremental updates reuse unchanged history until pruning is requested',()=>{
+ const first=updateLimitHistory([limit(20)],[],{},{now}),knownIds=new Set(first.history.map(point=>point.id));
+ const repeat=updateLimitHistory([limit(20)],first.history,first.notified,{now:now+1000,knownIds,prune:false});
+ assert.strictEqual(repeat.history,first.history);assert.equal(repeat.changed,false);assert.deepEqual(repeat.added,[]);
+});
+
 test('history view separates reset windows and reports sources',()=>{
  const history=[
   {id:'1',tool:'codex',windowMinutes:300,resetsAt:'2026-09-15T15:00:00Z',usedPercent:20,sourceObservedAt:'2026-09-15T10:00:00Z',source:'session-log'},

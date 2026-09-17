@@ -66,7 +66,18 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='GET') {
    if(url.pathname==='/api/health')return json(200,{app:'session-atlas',version:'1.0.0'});
    if(url.pathname==='/api/bootstrap')return json(200,{token,settings,startup:await startupStatus(),rates:effectiveRates(settings.prices),pricing:priceSyncStatus(),priceHistory:priceHistory.status(),dataDir:dataRoot,activeState:active.id,bridgeScript:path.join(root,'bridge','atlas-statusline.mjs')});
-   if(url.pathname==='/api/snapshot')return json(200,store.snapshot(settings));
+   if(url.pathname==='/api/snapshot')return json(200,store.snapshot(settings,{compact:true}));
+   if(url.pathname==='/api/limit-history'){
+    const tool=url.searchParams.get('tool');if(!['codex','claude'].includes(tool))return json(400,{error:'Ungültiges KI-Tool.'});
+    return json(200,{tool,history:store.limitHistory.filter(point=>point.tool===tool),scanCount:store.scanCount});
+   }
+   if(url.pathname==='/api/session-details'){
+    const id=url.searchParams.get('id');if(!id||id.length>500)return json(400,{error:'Ungültige Session-ID.'});
+    const snapshot=store.snapshot(settings,{sessionId:id,includeLimitHistory:false}),session=snapshot.sessions[0];return session?json(200,{session,detailRevision:snapshot.detailRevision}):json(404,{error:'Session nicht gefunden.'});
+   }
+   if(url.pathname==='/api/export-data'){
+    const snapshot=store.snapshot(settings,{includeLimitHistory:false,includeContextTimeline:false});return json(200,{sessions:snapshot.sessions,pricingMode:snapshot.pricingMode,pricingRuleVersion:snapshot.pricingRuleVersion});
+   }
    if(staticFiles[url.pathname]) {const [file,type]=staticFiles[url.pathname];res.writeHead(200,{'Content-Type':type});return res.end(await fs.readFile(path.join(root,'public',file)));}
   }
   if(req.method==='POST') {
@@ -78,18 +89,26 @@ const server=http.createServer(async(req,res)=>{
    }
    let body=(await readBody(req,64000)).toString('utf8');
    let input={};try {input=JSON.parse(body||'{}');}catch{return json(400,{error:'Ungültiges JSON.'});}
-   if(url.pathname==='/api/refresh'){if(mutating)return json(409,{error:'Ein lokaler Datenstand wird gerade geändert.'});const snapshot=await store.scan(settings);return json(200,{...snapshot,limitAlerts:store.takeLimitAlerts()});}
+   if(url.pathname==='/api/refresh'){if(mutating)return json(409,{error:'Ein lokaler Datenstand wird gerade geändert.'});const snapshot=await store.scan(settings,{compact:true});return json(200,{...snapshot,limitAlerts:store.takeLimitAlerts()});}
+   if(url.pathname==='/api/cache/reset'){
+    if(mutating)return json(409,{error:'Ein lokaler Datenstand wird gerade geändert.'});mutating=true;let previousCache;
+    try{
+     if(store.pending)await store.pending;await store.persist();const cacheFile=path.join(dataDir,'usage-cache.json');previousCache=await fs.readFile(cacheFile);
+     const fallback=await createBackup(dataDir,{sessionCount:store.snapshot(settings,{compact:true}).sessions.length}),backupDir=path.join(dataRoot,'recovery');await fs.mkdir(backupDir,{recursive:true});const fallbackFile=path.join(backupDir,`before-cache-reset-${new Date().toISOString().replaceAll(':','-')}.json.gz`);await fs.writeFile(fallbackFile,fallback.buffer);
+     const replacement=new Store(cacheFile,priceHistory),snapshot=await replacement.scan(settings,{compact:true});store=replacement;return json(200,{ok:true,fallbackFile,snapshot});
+    }catch(error){if(previousCache)try{const cacheFile=path.join(dataDir,'usage-cache.json'),rollback=cacheFile+'.reset-rollback';await fs.writeFile(rollback,previousCache);await fs.rename(rollback,cacheFile);}catch(rollbackError){error.message+=` · Cache-Rollback fehlgeschlagen: ${rollbackError.code||rollbackError.message}`;}throw error;}finally{mutating=false;}
+   }
    if(url.pathname==='/api/backup/export'){
     if(mutating)return json(409,{error:'Ein lokaler Datenstand wird gerade geändert.'});mutating=true;try{if(store.pending)await store.pending;await store.persist();
-     const backup=await createBackup(dataDir,{sessionCount:store.snapshot(settings).sessions.length});res.writeHead(200,{'Content-Type':'application/gzip','Content-Disposition':`attachment; filename="session-atlas-backup-${backup.createdAt.slice(0,10)}.json.gz"`,'Content-Length':backup.buffer.length});return res.end(backup.buffer);
+     const backup=await createBackup(dataDir,{sessionCount:store.snapshot(settings,{compact:true}).sessions.length});res.writeHead(200,{'Content-Type':'application/gzip','Content-Disposition':`attachment; filename="session-atlas-backup-${backup.createdAt.slice(0,10)}.json.gz"`,'Content-Length':backup.buffer.length});return res.end(backup.buffer);
     }finally{mutating=false;}
    }
    if(url.pathname==='/api/backup/restore'){
     if(mutating)return json(409,{error:'Eine Änderung wird gerade gespeichert.'});const plan=restorePlans.get(input.restoreId);if(!plan||plan.expires<Date.now())return json(410,{error:'Die geprüfte Vorschau ist abgelaufen. Bitte die Sicherung erneut auswählen.'});mutating=true;
     const previous=active;try{
-     if(store.pending)await store.pending;await store.persist();const fallback=await createBackup(dataDir,{sessionCount:store.snapshot(settings).sessions.length});const backupDir=path.join(dataRoot,'recovery');await fs.mkdir(backupDir,{recursive:true});const fallbackFile=path.join(backupDir,`before-restore-${new Date().toISOString().replaceAll(':','-')}.json.gz`);await fs.writeFile(fallbackFile,fallback.buffer);
+     if(store.pending)await store.pending;await store.persist();const fallback=await createBackup(dataDir,{sessionCount:store.snapshot(settings,{compact:true}).sessions.length});const backupDir=path.join(dataRoot,'recovery');await fs.mkdir(backupDir,{recursive:true});const fallbackFile=path.join(backupDir,`before-restore-${new Date().toISOString().replaceAll(':','-')}.json.gz`);await fs.writeFile(fallbackFile,fallback.buffer);
      const prepared=await prepareState(dataRoot,mappedRestoreFiles(plan,input.rootMappings));await activateState(dataRoot,prepared);await reloadRuntime(prepared.dir);active=prepared;restorePlans.delete(input.restoreId);
-     return json(200,{ok:true,fallbackFile,settings,pricing:priceSyncStatus(),priceHistory:priceHistory.status(),rates:effectiveRates(settings.prices),snapshot:store.snapshot(settings),activeState:active.id});
+     return json(200,{ok:true,fallbackFile,settings,pricing:priceSyncStatus(),priceHistory:priceHistory.status(),rates:effectiveRates(settings.prices),snapshot:store.snapshot(settings,{compact:true}),activeState:active.id});
     }catch(error){await activateStateId(dataRoot,previous.id);await reloadRuntime(previous.dir);active=previous;throw error;}finally{mutating=false;}
    }
    if(url.pathname==='/api/prices/sync') {
@@ -101,7 +120,7 @@ const server=http.createServer(async(req,res)=>{
    if(url.pathname==='/api/prices/compare'){
     if(mutating)return json(409,{error:'Ein lokaler Datenstand wird gerade geändert.'});
     const ids=[input.first,input.second];if(ids.some(id=>typeof id!=='string'||!priceHistory.snapshots.some(item=>item.id===id)))throw Error('Bitte zwei vorhandene Preisstände auswählen.');const from=input.from?Date.parse(`${input.from}T00:00:00`):-Infinity,to=input.to?Date.parse(`${input.to}T23:59:59.999`):Infinity;if(!Number.isFinite(from)&&from!==-Infinity||!Number.isFinite(to)&&to!==Infinity||from>to)throw Error('Ungültiger Vergleichszeitraum.');
-    const events=store.snapshot(settings).sessions.flatMap(session=>session.events).filter(event=>{const time=Date.parse(event.time);return time>=from&&time<=to;}),summarize=id=>{let cost=0,unknown=0;for(const event of events){const value=priceHistory.evaluateSnapshot(event,id).cost;if(value===null)unknown++;else cost+=value;}return {id,cost,unknown,events:events.length};};return json(200,{first:summarize(ids[0]),second:summarize(ids[1])});
+     const events=store.snapshot(settings,{compact:true}).sessions.flatMap(session=>session.events).filter(event=>{const time=Date.parse(event.time);return time>=from&&time<=to;}),summarize=id=>{let cost=0,unknown=0;for(const event of events){const value=priceHistory.evaluateSnapshot(event,id).cost;if(value===null)unknown++;else cost+=value;}return {id,cost,unknown,events:events.length};};return json(200,{first:summarize(ids[0]),second:summarize(ids[1])});
    }
    if(url.pathname==='/api/settings'||url.pathname==='/api/startup') {
     if(mutating)return json(409,{error:'Eine Änderung wird gerade gespeichert.'});mutating=true;

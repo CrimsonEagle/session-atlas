@@ -3,7 +3,7 @@ import {attachTooltips,axisLabel,nextSort,seriesChart,sortableHeader,sortRows,ti
 import {contextHistoryView} from './context-history.js';
 
 export function createDetailViews(options) {
- const {dialog,content,getData,getFiltered,getScope,applyFilter,esc,num,compact,money,date,basename,toolName,toolTag,costText}=options;
+ const {dialog,content,getData,getFiltered,getScope,applyFilter,loadSessionDetails,esc,num,compact,money,date,basename,toolName,toolTag,costText}=options;
  const pageSize=12,responsePageSize=20;
  let state={view:null},history=[],searchTimer;
 
@@ -92,7 +92,8 @@ export function createDetailViews(options) {
  }
  function render(){if(state.view==='aggregate')renderAggregate();else if(state.view==='session')renderSession();}
  function open(next,push=false){if(push&&state.view)history.push(copy(state));else if(!dialog.open)history=[];state=next;render();}
- function session(id,push=false){open({view:'session',id,scope:'filtered',metric:'tokens',responseSort:'activity',responseSortDirection:'desc',responsePage:0},push);}
+ function hydrateSession(id){if(!loadSessionDetails)return;Promise.resolve(loadSessionDetails(id)).then(()=>{if(dialog.open&&state.view==='session'&&state.id===id)render();}).catch(()=>{});}
+ function session(id,push=false){open({view:'session',id,scope:'filtered',metric:'tokens',responseSort:'activity',responseSortDirection:'desc',responsePage:0},push);hydrateSession(id);}
  function aggregate(kind,key){open({view:'aggregate',kind,key,metric:'tokens',dimension:null,search:'',agent:'all',sessionSort:'tokens',sessionSortDirection:'desc',sessionPage:0});}
  function close(){dialog.close();history=[];state={view:null};dialog.classList.remove('detail-wide');}
  function handleClick(event){
@@ -124,5 +125,6 @@ export function createDetailViews(options) {
    hideTooltips();render();
   });
  });
- return {session,aggregate,close,render};
+ function dataChanged(){if(!dialog.open||!state.view)return;render();if(state.view==='session')hydrateSession(state.id);}
+ return {session,aggregate,close,render,dataChanged};
 }

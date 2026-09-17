@@ -25,7 +25,10 @@ test('HTTP API is local, rejects foreign origins/mutations, validates settings a
  assert.equal((await post('/api/settings',{...bootstrap.settings,claudeRoots:['relative/path']})).status,400);
  assert.equal((await post('/api/settings',{...bootstrap.settings,intervalSeconds:10})).status,200);
  const result=await(await post('/api/refresh',{})).json();assert.deepEqual(result.sessions,[]);assert.equal(result.stats.scanCount,1);
- const snapshot=await(await fetch(base+'/api/snapshot')).json();assert.equal(snapshot.stats.scanCount,1);
+ const snapshot=await(await fetch(base+'/api/snapshot')).json();assert.equal(snapshot.stats.scanCount,1);assert.equal(snapshot.limitHistory,undefined);
+ const history=await(await fetch(base+'/api/limit-history?tool=codex')).json();assert.deepEqual(history.history,[]);assert.equal((await fetch(base+'/api/limit-history?tool=other')).status,400);
+ assert.equal((await fetch(base+'/api/session-details?id=codex%3Amissing')).status,404);const exported=await(await fetch(base+'/api/export-data')).json();assert.deepEqual(exported.sessions,[]);
+ const reset=await(await post('/api/cache/reset',{})).json();assert.equal(reset.ok,true);assert.deepEqual(reset.snapshot.sessions,[]);assert.equal(typeof reset.snapshot.detailRevision,'string');assert.ok((await fs.stat(reset.fallbackFile)).size>50);
  const backupResponse=await post('/api/backup/export',{});assert.equal(backupResponse.status,200);assert.match(backupResponse.headers.get('content-type'),/application\/gzip/);const backup=await backupResponse.arrayBuffer();assert.ok(backup.byteLength>50);
  const badPreview=await fetch(base+'/api/backup/preview',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-Atlas-Token':bootstrap.token},body:Buffer.from('damaged')});assert.equal(badPreview.status,400);
  const previewResponse=await fetch(base+'/api/backup/preview',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-Atlas-Token':bootstrap.token},body:backup});assert.equal(previewResponse.status,200);const preview=await previewResponse.json();assert.equal(preview.sessionCount,0);assert.ok(preview.categories.some(item=>item.file==='usage-cache.json'));

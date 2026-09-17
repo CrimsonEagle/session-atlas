@@ -13,9 +13,9 @@ const codexCumulative=(input=100)=>codexLine({type:'event_msg',timestamp:'2026-0
 const codexRecord=(id='thread',response='response',input=100)=>codexLine({type:'token_usage_record',timestamp:'2026-09-11T10:01:00Z',payload:{thread_id:id,response_id:response,usage:{input_tokens:input,output_tokens:10}}});
 test('Incremental scan handles split UTF-8 lines, cache reload and historical retention',async t=>{
  const {dir,logs,settings}=await fixture(t);const file=path.join(logs,'session.jsonl'),cache=path.join(dir,'cache.json');const s=new Store(cache);
- await fs.writeFile(file,line('one')+line('twö').slice(0,60));let x=await s.scan(settings);assert.equal(x.sessions[0].events.length,1);
- const unchanged=await s.scan(settings);assert.equal(unchanged.stats.bytes,0);assert.equal(unchanged.stats.changed,0);
- await fs.appendFile(file,line('twö').slice(60));x=await s.scan(settings);assert.equal(x.sessions[0].events.length,2);
+ await fs.writeFile(file,line('one')+line('twö').slice(0,60));let x=await s.scan(settings);assert.equal(x.sessions[0].events.length,1);const firstRevision=x.detailRevision;
+ const unchanged=await s.scan(settings);assert.equal(unchanged.stats.bytes,0);assert.equal(unchanged.stats.changed,0);assert.equal(unchanged.detailRevision,firstRevision);
+ await fs.appendFile(file,line('twö').slice(60));x=await s.scan(settings);assert.equal(x.sessions[0].events.length,2);assert.notEqual(x.detailRevision,firstRevision);
  const saved=await fs.readFile(cache,'utf8');assert.ok(!saved.includes('PRIVATE CONTENT'));const restored=new Store(cache);await restored.load();assert.equal(restored.snapshot(settings).sessions[0].events.length,2);
  await fs.unlink(file);x=await restored.scan(settings);assert.equal(x.sessions[0].events.length,2);
  assert.equal(restored.snapshot({...settings,claudeRoots:[]}).sessions.length,0);
@@ -153,5 +153,7 @@ test('Overlapping roots are read once and parallel completion preserves duplicat
 test('Context history deduplicates archive copies and never adds usage events',async t=>{
  const {dir,logs,settings}=await fixture(t),message={type:'assistant',timestamp:'2026-09-11T10:00:00Z',sessionId:'session',cwd:'C:/example',message:{id:'shared',model:'claude-sonnet-4-6',usage:{input_tokens:100,cache_read_input_tokens:50,output_tokens:10,model_context_window:1000}}},compact={type:'system',subtype:'compact_boundary',uuid:'compact',timestamp:'2026-09-11T10:01:00Z',sessionId:'session'};
  const content=JSON.stringify(message)+'\n'+JSON.stringify(compact)+'\n';await fs.writeFile(path.join(logs,'one.jsonl'),content);await fs.writeFile(path.join(logs,'copy.jsonl'),content);
- const result=await new Store(path.join(dir,'cache.json')).scan(settings);assert.equal(result.sessions.length,1);assert.equal(result.sessions[0].events.length,1);assert.equal(result.sessions[0].contextTimeline.length,2);assert.deepEqual(result.sessions[0].contextTimeline.map(item=>item.kind),['sample','compaction']);
+ const store=new Store(path.join(dir,'cache.json')),result=await store.scan(settings);assert.equal(result.sessions.length,1);assert.equal(result.sessions[0].events.length,1);assert.equal(result.sessions[0].contextTimeline.length,2);assert.deepEqual(result.sessions[0].contextTimeline.map(item=>item.kind),['sample','compaction']);
+ const compactSnapshot=store.snapshot(settings,{compact:true});assert.equal(compactSnapshot.limitHistory,undefined);assert.equal(compactSnapshot.sessions[0].contextTimeline,undefined);assert.equal(compactSnapshot.sessions[0].events[0].pricingMode,undefined);assert.equal(typeof compactSnapshot.sessions[0].events[0].cost,'number');assert.equal(typeof compactSnapshot.detailRevision,'string');
+ const detailed=store.snapshot(settings,{sessionId:'claude:session',includeLimitHistory:false});assert.equal(detailed.sessions.length,1);assert.equal(detailed.sessions[0].contextTimeline.length,2);assert.equal(detailed.sessions[0].events[0].pricingMode,'current');assert.equal(detailed.detailRevision,compactSnapshot.detailRevision);
 });
