@@ -67,7 +67,7 @@ export function seriesChart({rows,format,period='day',width=730,height=220,idPre
  const left=Math.max(84,Math.min(124,Math.round(Math.max(...scale.map(label=>label.length))*6.2)+14));
  const top=17,plotW=width-14-left,plotH=height-65,step=plotW/Math.max(1,rows.length),bar=Math.min(28,step*.58);
  const every=Math.max(1,Math.ceil(rows.length/Math.max(4,Math.round(width/95))));
- let svg=`<defs><linearGradient id="${idPrefix}-codex" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7390f3"/><stop offset="1" stop-color="#4868d8"/></linearGradient><linearGradient id="${idPrefix}-claude" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d0a3e4"/><stop offset="1" stop-color="#a66fc1"/></linearGradient></defs>`;
+ let svg=`<defs><linearGradient id="${idPrefix}-codex" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7390f3"/><stop offset="1" stop-color="#4868d8"/></linearGradient><linearGradient id="${idPrefix}-claude" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e99b7f"/><stop offset="1" stop-color="#d97757"/></linearGradient></defs>`;
  scale.forEach((label,index)=>{const y=top+plotH*index/3;svg+=`<line class="grid-line" x1="${left}" y1="${y}" x2="${width-14}" y2="${y}"/><text x="${left-9}" y="${y+4}" text-anchor="end">${esc(label)}</text>`;});
  svg+=`<line class="chart-axis" x1="${left}" y1="${top+plotH}" x2="${width-14}" y2="${top+plotH}"/>`;
  rows.forEach((row,index)=>{

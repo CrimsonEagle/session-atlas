@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {analytics,bucketSeries,chartScopedSessions,comparisonRange,comparisonRows,filterSessions,grouped,periodKey,rangeForPeriod,relativeSeries,selectGroup,selectPeriod,totals} from '../public/analytics-core.js';
+import {analytics,bucketSeries,chartScopedSessions,comparisonRange,comparisonRows,filterSessions,grouped,periodKey,rangeForLimitWindow,rangeForPeriod,relativeSeries,selectGroup,selectPeriod,totals} from '../public/analytics-core.js';
 
 const event=(time,model,tokens,cost=.01,extra={})=>({time,model,input:tokens,cache:0,write:0,output:0,reasoning:0,cost,tier:'standard',...extra});
 const sessions=[
@@ -67,6 +67,13 @@ test('shared period ranges follow local calendar boundaries',()=>{
  assert.equal(new Date(week.start).getDay(),1);assert.equal(new Date(week.start).getDate(),14);
  assert.equal(new Date(month.start).getDate(),1);assert.equal(new Date(rolling.start).getDate(),9);
  assert.equal(week.end,now);
+});
+
+test('limit cost ranges follow the provider reset boundary',()=>{
+ const now=Date.parse('2026-09-17T17:08:00Z'),reset=Date.parse('2026-09-17T21:14:00Z');
+ assert.deepEqual(rangeForLimitWindow({window_minutes:300,resets_at:reset/1000},{now}),{start:Date.parse('2026-09-17T16:14:00Z'),end:now,reset,windowMinutes:300});
+ assert.equal(rangeForLimitWindow({window_minutes:300,resets_at:now/1000},{now}),null);
+ assert.equal(rangeForLimitWindow({window_minutes:300,resets_at:null},{now}),null);
 });
 
 test('the twelve-month range keeps local calendar days and includes today',()=>{

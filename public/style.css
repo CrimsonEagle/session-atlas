@@ -101,9 +101,9 @@ dialog{box-shadow:0 25px 100px var(--shadow);overflow:auto}
 .limits-panel .track{height:9px;border-radius:9px}
 .limits-panel .track i{border-radius:9px}
 .limits-panel .reset-note{margin-top:7px}
-.rolling-costs{display:flex;justify-content:space-between;gap:12px;margin-top:17px;padding:12px 13px;background:var(--surface-soft);border:1px solid var(--line-soft);border-radius:8px;color:var(--muted);font-size:10px}
+.rolling-costs{display:flex;justify-content:space-between;gap:12px;margin-top:17px;padding:12px 13px;background:var(--surface-soft);border:1px solid var(--line-soft);border-radius:8px;color:var(--muted);font-size:12px}
 .rolling-costs span{display:flex;align-items:center;gap:7px}
-.rolling-costs strong{color:var(--ink);font-size:12px;white-space:nowrap}
+.rolling-costs strong{color:var(--ink);font-size:inherit;font-weight:650;white-space:nowrap}
 .page-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
 :root{--danger:#b4233b;--danger-border:#e4a5b0;--danger-bg:#fff4f6}
 :root[data-theme=dark]{--danger:#ff8ca0;--danger-border:#874354;--danger-bg:#35202a}
@@ -408,3 +408,17 @@ dialog th.sorted .sort-mark{border-color:color-mix(in srgb,var(--detail-indigo) 
  .sort-mark{width:16px;height:16px;flex-basis:16px}
 }
 @media(prefers-reduced-motion:reduce){tbody tr{transition:none}}
+
+/* Claude Code uses the terracotta brand color sampled from the Claude mark. */
+:root{--claude:#d97757;--claude-soft:#fff0eb}
+:root[data-theme=dark]{--claude-soft:#432820}
+@media(prefers-color-scheme:dark){:root[data-theme=system]{--claude-soft:#432820}}
+.tool-logo.claude{background:var(--claude-soft);color:var(--claude)}
+
+/* These violet series describe time ranges, not Claude Code. */
+.comparison-key.previous{border-top-color:var(--atlas-violet)}
+.comparison-line.previous{stroke:var(--atlas-violet)}
+.comparison-point.previous{fill:var(--atlas-violet)}
+.limit-history-series.window-10080 .limit-history-line{stroke:var(--atlas-violet)}
+.limit-history-series.window-10080 .limit-history-area{fill:var(--atlas-violet)}
+.limit-history-legend .window-10080{border-color:var(--atlas-violet);background:color-mix(in srgb,var(--atlas-violet) 16%,transparent)}

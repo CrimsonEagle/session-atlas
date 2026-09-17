@@ -27,6 +27,14 @@ export function rangeForPeriod(period='30',{now=Date.now(),from='',to=''}={}) {
  return {start,end,period};
 }
 
+export function rangeForLimitWindow(window,{now=Date.now()}={}) {
+ const minutes=Number(window?.window_minutes),reset=Number(window?.resets_at)*1000;
+ if(!Number.isFinite(minutes)||minutes<=0||!Number.isFinite(reset)||reset<=now)return null;
+ const start=reset-minutes*60000;
+ if(!Number.isFinite(start)||start>now)return null;
+ return {start,end:now,reset,windowMinutes:minutes};
+}
+
 export function comparisonRange(current,mode='previous',{from='',to=''}={}) {
  if(!current||!Number.isFinite(current.start)||!Number.isFinite(current.end)||current.start<=0||current.end<current.start)return null;
  if(mode==='previous'&&current.period==='month')return comparisonRange(current,'month');

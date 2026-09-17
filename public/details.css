@@ -216,7 +216,7 @@ dialog .close:hover,.detail-back:hover{
 .detail-section-head h3::before{content:'';width:4px;height:17px;border-radius:5px;background:linear-gradient(var(--detail-indigo),var(--detail-violet))}
 .detail-chart-wrap{border-top:0;background:linear-gradient(180deg,color-mix(in srgb,var(--detail-indigo-soft) 30%,var(--surface)),var(--surface) 46%)}
 .detail-chart-legend .dot.codex{background:var(--detail-indigo)}
-.detail-chart-legend .dot.claude{background:var(--detail-violet)}
+.detail-chart-legend .dot.claude{background:var(--claude)}
 
 .detail-breakdown{
  --breakdown-accent:var(--detail-indigo);
