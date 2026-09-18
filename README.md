@@ -1,6 +1,6 @@
 # Session Atlas
 
-Portable, lokale Nutzungsanalyse für **Claude Code und OpenAI Codex**. Ohne Installer, npm-Abhängigkeiten, API-Schlüssel oder externe Schriftarten. Die Auswertung funktioniert offline; nur der optionale Preisabruf benötigt Internet. Benötigt **Node.js 22 oder neuer** und einen aktuellen Browser. Für Windows entwickelt.
+Portable, lokale Nutzungsanalyse für **Claude Code und OpenAI Codex**. Ohne Installer, npm-Installation, API-Schlüssel oder externe Schriftarten. Die Auswertung funktioniert offline; nur der optionale Preisabruf benötigt Internet. Benötigt **Node.js 22 oder neuer** und einen aktuellen Browser. Für Windows entwickelt.
 
 ## Starten
 
@@ -38,6 +38,8 @@ npm start
 - Vollständiges lokales gzip-Backup mit Manifest und SHA-256-Prüfsummen sowie kontrollierter Wiederherstellung. Vor der Übernahme erscheinen Größe, Sessionanzahl und Kategorien; fehlende Quellordner können neu zugeordnet werden. Vor jedem Restore entsteht automatisch ein Rückfallstand.
 - Windows-Autostart in den Einstellungen aktivieren/deaktivieren. Es wird eine Verknüpfung im Autostartordner des aktuellen Nutzers erstellt; keine Administratorrechte, kein Dienst, keine Installation.
 - „App vollständig beenden“ beendet den Node-Prozess. Das Schließen des Browsertabs lässt den ruhenden Server weiterlaufen.
+
+Der animierte Hintergrund nutzt lokal mitgeliefertes **PixiJS 8.18.0 (MIT)** mit WebGL: leuchtende Partikel auf bewegten Kurven, wählbares FPS-Limit (30, 60, 120, 144 oder Monitor-Maximum; Standard 60), mit dem Bildschirm synchronisiert, 48 Partikel (24 auf schmalen Displays), Renderauflösung bis 4K (8,29 Millionen Pixel), bis zu zweifache Pixeldichte für HiDPI-Displays und WebGL-Kantenglättung. Partikelgröße und Geschwindigkeit bleiben unabhängig von der Pixeldichte. Keine Blur-Filter; die Szene fordert einen stromsparenden Grafikadapter an. Tabwechsel und Minimieren stornieren den Animation-Frame; es gibt keinen Animationstimer; PixiJS-System-/Shared-Ticker bleiben deaktiviert. Bei Rückkehr wird ohne Zeitsprung fortgesetzt. „Reduzierte Bewegung“ zeigt ein statisches Motiv. Unter **Einstellungen → Animierter Hintergrund** lässt sich die Animation ein-/ausschalten und das FPS-Limit wählen. Beide Einstellungen wirken sofort und bleiben in diesem Browser gespeichert. Monitor-Maximum zeichnet bei jedem vom Browser gelieferten Animation-Frame; die tatsächliche Bildrate hängt vom Display, Browser und der verfügbaren Leistung ab. Ohne verfügbares WebGL bleibt die App bedienbar und zeigt in den Einstellungen einen Hinweis. Die tatsächliche CPU-/GPU-Last hängt vom Gerät ab.
 
 ## Datenquellen und Privatheit
 

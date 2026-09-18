@@ -248,8 +248,8 @@ body{
 .local-symbol{color:#6fd0df}
 
 .topbar{
- background:color-mix(in srgb,var(--surface) 88%,transparent);
- backdrop-filter:blur(16px) saturate(1.15);
+ /* An opaque header avoids continuously blurring the moving background. */
+ background:var(--surface);
  box-shadow:0 1px 0 color-mix(in srgb,var(--atlas-indigo) 8%,transparent);
 }
 .page-heading h1{color:color-mix(in srgb,var(--ink) 88%,var(--atlas-indigo));font-size:32px}

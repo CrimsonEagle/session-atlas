@@ -1,0 +1,15 @@
+body { isolation: isolate; }
+.atlas-background {
+ position: fixed;
+ inset: 0;
+ z-index: -1;
+ overflow: hidden;
+ pointer-events: none;
+ contain: strict;
+ opacity: .85;
+}
+.atlas-background canvas { display: block; width: 100%; height: 100%; }
+:root[data-background=off] .atlas-background { display: none; }
+.background-quality { display: grid; gap: 8px; margin: 18px 0 8px; font-size: 12px; font-weight: 550; }
+.background-quality select { width: 100%; font-weight: 400; }
+@media print { .atlas-background { display: none; } }
