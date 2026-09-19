@@ -1,134 +1,134 @@
 # Session Atlas
 
-Portable, lokale Nutzungsanalyse für **Claude Code und OpenAI Codex**. Ohne Installer, npm-Installation, API-Schlüssel oder externe Schriftarten. Die Auswertung funktioniert offline; nur der optionale Preisabruf benötigt Internet. Benötigt **Node.js 22 oder neuer** und einen aktuellen Browser. Für Windows entwickelt.
+Portable, local usage analytics for **Claude Code and OpenAI Codex**. No installer, npm installation, API keys, or external fonts. Analytics work offline; only the optional pricing update requires internet access. Requires **Node.js 22 or newer** and a current browser. Developed for Windows.
 
-## Starten
+## Getting Started
 
-**`Start.cmd` doppelklicken.** Der Node-Prozess startet im Hintergrund und öffnet die Oberfläche unter **http://127.0.0.1:4317**. Erneutes Starten öffnet die bestehende App. Das kurze Startfenster schließt sich wieder.
+**Double-click `Start.cmd`.** The Node process starts in the background and opens the interface at **http://127.0.0.1:4317**. Starting it again opens the existing app. The brief startup window closes automatically.
 
-Alternativ im Projektordner:
+Alternatively, run this in the project folder:
 
 ```powershell
 node launcher.mjs
 ```
 
-Oder mit sichtbarem Terminal für Diagnose (anschließend die Adresse im Browser öffnen):
+Or use a visible terminal for diagnostics, then open the address in your browser:
 
 ```powershell
 npm start
 ```
 
-`npm install` ist nicht nötig. Mit `node server.mjs --open` lässt sich der Browser auch beim Terminalstart öffnen. Wenn eine Firmenrichtlinie Node, PowerShell oder das Öffnen von Browsern blockiert, umgeht die App diese Richtlinie nicht. `node server.mjs` mit manuellem Browseraufruf benötigt keine PowerShell.
+`npm install` is not required. Use `node server.mjs --open` to open the browser when starting from a terminal as well. If a corporate policy blocks Node, PowerShell, or opening browsers, the app does not bypass that policy. Running `node server.mjs` and opening the browser manually does not require PowerShell.
 
-## Funktionen
+## Features
 
-- Live-Übersicht, gestapelte Verlaufsdiagramme für Tokens/Kosten, Tages-/Wochen-/Monatsaggregation.
-- Direkter Vergleich zweier Zeiträume mit Kennzahlen, relativer Zeitachse und Beiträgen nach Projekt, Modell oder KI-Tool. Verfügbar sind die gleich lange Vorperiode, vorige Kalenderwoche, voriger Kalendermonat und ein eigener Vergleichszeitraum.
-- Aktivitätskalender für die letzten zwölf Monate oder ein Kalenderjahr, wahlweise nach Tokens, API-Gegenwert oder Modellantworten. Ein ausgewählter Tag grenzt Tabelle und Details auf denselben lokalen Kalendertag ein.
-- Aufgabenansicht für Codex-Hauptsessions und explizit zugeordnete Subagents beziehungsweise Prüf-Agents. Aufklappbare Bäume unterscheiden Eigenverbrauch und Verbrauch einschließlich untergeordneter Agents; unsichere oder fehlende Beziehungen bleiben sichtbar statt geschätzt zu werden.
-- Sessions, Repositories, Arbeitsordner, KI-Tools und Modelle als Gruppierungen; Suche sowie kombinierte Tool-, Repository-, Modell- und Datumsfilter.
-- Sessiondetails mit Modellantworten, Branch, Arbeitsordner, Input-/Output-/Cache-/Reasoning-Tokens und einem Kontextverlauf. Modell-/Fensterwechsel, Datenlücken sowie ausdrücklich protokollierte Komprimierungen werden markiert; fehlende Fenstergrößen erzeugen keine erfundenen Prozentwerte.
-- 5-Stunden-/Wochenlimits für beide Tools, inklusive Plan, Messzeitpunkt und Reset: Codex aus den letzten protokollierten `rate_limits`, Claude Code aus `cachedUsageUtilization` in `.claude.json` und optional aus der Statusline-Bridge. Angezeigt wird jeweils der jüngere Messwert samt Quelle. Abgelaufene Messwerte erscheinen als unbekannt, nicht als 0 %.
-- Persistenter Limitverlauf mit sichtbaren Resetgrenzen und Quellen sowie konfigurierbaren Schwellenhinweisen. Voreinstellung: 80 % und 95 %, höchstens einmal je Schwelle und Resetfenster; Aufbewahrung standardmäßig 90 Tage.
-- Eigene Kostenlimit-Ansicht im Limit-Detail: Für jeden historischen Messpunkt werden die bekannten API-Kosten seit Beginn des gemeldeten 5-Stunden- beziehungsweise Wochenfensters durch die Usage geteilt und auf 100 % hochgerechnet. Umschaltbar zeigt die Darstellung entweder alle Einzelmessungen oder genau einen arithmetischen Mittelwert je Resetfenster; beide Schätzreihen, jüngster Wert, Median, Spannweite und Preisabdeckung sind sichtbar. 0 %, fehlende Resets und vollständig unbekannte Preise erzeugen keinen erfundenen Wert.
-- Rollierende Kosten der letzten 5 Stunden / 7 Tage für beide Tools. Diese sind **kein identisches Abrechnungsfenster** und kein Ersatz für prozentuale Abolimits.
-- Manuelles Aktualisieren und automatischer Scan (Standard 30 s, einstellbar 10–3600 s).
-- Fokusverlust, anderer Browsertab oder minimiertes Fenster stoppen weitere automatische Scans. Bei Rückkehr sofortige Aktualisierung. Ein schon laufender Scan darf zu Ende laufen. Ein zusätzlich geöffnetes, fokussiertes App-Fenster kann weiterhin Scans auslösen. Der Server hat keinen Hintergrund-Polling-Timer und keine Dateiwatcher.
-- CSV-Export der gefilterten Nutzungsereignisse mit präzisen Werten, kompatibel mit deutschem Excel. Zellinhalte werden gegen Formelausführung abgesichert. Gruppierung verändert nur die Ansicht; der Export bleibt auf Ereignisebene.
-- Wahl zwischen aktueller und historisch hinterlegter Preisbewertung. Unveränderliche Preisstände, Gültigkeitsbeginn, Quelle und Regelversion bleiben lokal nachvollziehbar; zwei Stände lassen sich für denselben Zeitraum vergleichen. Der CSV-Export enthält Bewertungsmodus, Preisstand-Referenz und Regelversion.
-- Vollständiges lokales gzip-Backup mit Manifest und SHA-256-Prüfsummen sowie kontrollierter Wiederherstellung. Vor der Übernahme erscheinen Größe, Sessionanzahl und Kategorien; fehlende Quellordner können neu zugeordnet werden. Vor jedem Restore entsteht automatisch ein Rückfallstand.
-- Windows-Autostart in den Einstellungen aktivieren/deaktivieren. Es wird eine Verknüpfung im Autostartordner des aktuellen Nutzers erstellt; keine Administratorrechte, kein Dienst, keine Installation.
-- „App vollständig beenden“ beendet den Node-Prozess. Das Schließen des Browsertabs lässt den ruhenden Server weiterlaufen.
+- Live overview, stacked timeline charts for tokens and costs, and daily, weekly, or monthly aggregation.
+- Direct comparison of two periods with metrics, a relative timeline, and contributions by project, model, or AI tool. Available comparison periods are the preceding period of equal length, previous calendar week, previous calendar month, and a custom period.
+- Activity calendar for the last twelve months or a calendar year, selectable by tokens, API-equivalent cost, or model responses. Selecting a day restricts the table and details to the same local calendar day.
+- Task view for Codex parent sessions and explicitly associated subagents or review agents. Expandable trees distinguish self usage from usage including child agents; uncertain or missing relationships remain visible instead of being estimated.
+- Sessions, repositories, working directories, AI tools, and models as grouping options, plus search and combined tool, repository, model, and date filters.
+- Session details with model responses, branch, working directory, input/output/cache/reasoning tokens, and a context timeline. Model or context-window changes, data gaps, and explicitly logged compactions are marked; missing window sizes do not produce invented percentages.
+- Five-hour and weekly limits for both tools, including plan, measurement time, and reset: Codex from the latest logged `rate_limits`; Claude Code from `cachedUsageUtilization` in `.claude.json` and optionally from the status-line bridge. The newest measurement and its source are shown. Expired measurements appear as unknown, not 0%.
+- Persistent limit history with visible reset boundaries and sources, plus configurable threshold notifications. Defaults: 80% and 95%, at most once per threshold and reset window; retention defaults to 90 days.
+- Dedicated cost-limit view in the limit details: for every historical measurement, known API costs since the start of the reported five-hour or weekly window are divided by usage and extrapolated to 100%. The view can show either every individual measurement or exactly one arithmetic mean per reset window; both estimate series, the latest value, median, range, and pricing coverage are visible. Usage of 0%, missing resets, and entirely unknown prices do not produce invented values.
+- Rolling costs for the last five hours or seven days for both tools. These are **not identical billing windows** and are not a substitute for percentage-based subscription limits.
+- Manual refresh and automatic scanning (default 30 seconds, configurable from 10 to 3,600 seconds).
+- Losing focus, switching browser tabs, or minimizing the window stops further automatic scans. Returning triggers an immediate refresh. A scan already in progress is allowed to finish. An additional open, focused app window may continue to trigger scans. The server has no background polling timer and no file watchers.
+- CSV export of filtered usage events with precise values, compatible with German Excel. Cell contents are protected against formula execution. Grouping changes only the view; exports remain at event level.
+- Choice between current and historically recorded pricing. Immutable pricing snapshots, effective dates, sources, and rule versions remain locally auditable; two snapshots can be compared for the same period. CSV exports include valuation mode, pricing-snapshot reference, and rule version.
+- Complete local gzip backup with a manifest and SHA-256 checksums, plus controlled restoration. Size, session count, and categories are displayed before import; missing source folders can be remapped. A recovery snapshot is created automatically before every restore.
+- Enable or disable Windows startup in the settings. A shortcut is created in the current user's Startup folder; no administrator rights, service, or installation are required.
+- “Exit App Completely” stops the Node process. Closing the browser tab leaves the idle server running.
 
-Der animierte Hintergrund nutzt lokal mitgeliefertes **PixiJS 8.21.0 (MIT)** mit WebGL: leuchtende Partikel auf bewegten Kurven, wählbares FPS-Limit (30, 60, 120, 144 oder Monitor-Maximum; Standard 60), mit dem Bildschirm synchronisiert, 48 Partikel (24 auf schmalen Displays), Renderauflösung bis 4K (8,29 Millionen Pixel), bis zu zweifache Pixeldichte für HiDPI-Displays und WebGL-Kantenglättung. Partikelgröße und Geschwindigkeit bleiben unabhängig von der Pixeldichte. Keine Blur-Filter; die Szene fordert einen stromsparenden Grafikadapter an. Tabwechsel und Minimieren stornieren den Animation-Frame; es gibt keinen Animationstimer; PixiJS-System-/Shared-Ticker bleiben deaktiviert. Bei Rückkehr wird ohne Zeitsprung fortgesetzt. „Reduzierte Bewegung“ zeigt ein statisches Motiv. Unter **Einstellungen → Animierter Hintergrund** lässt sich die Animation ein-/ausschalten und das FPS-Limit wählen. Beide Einstellungen wirken sofort und bleiben in diesem Browser gespeichert. Monitor-Maximum zeichnet bei jedem vom Browser gelieferten Animation-Frame; die tatsächliche Bildrate hängt vom Display, Browser und der verfügbaren Leistung ab. Ohne verfügbares WebGL bleibt die App bedienbar und zeigt in den Einstellungen einen Hinweis. Die tatsächliche CPU-/GPU-Last hängt vom Gerät ab.
+The animated background uses the locally bundled **PixiJS 8.21.0 (MIT)** with WebGL: glowing particles on moving curves, a selectable FPS cap (30, 60, 120, 144, or monitor maximum; default 60), synchronization with the display, 48 particles (24 on narrow displays), rendering resolution up to 4K (8.29 million pixels), up to 2× pixel density for HiDPI displays, and WebGL antialiasing. Particle size and speed remain independent of pixel density. No blur filters are used; the scene requests a power-efficient graphics adapter. Switching tabs or minimizing cancels the animation frame; there is no animation timer, and PixiJS system/shared tickers remain disabled. On return, animation resumes without a time jump. “Reduced Motion” displays a static motif. Under **Settings → Animated Background**, you can enable or disable the animation and select the FPS cap. Both settings take effect immediately and are stored in this browser. Monitor maximum renders on every animation frame supplied by the browser; the actual frame rate depends on the display, browser, and available performance. If WebGL is unavailable, the app remains usable and shows a notice in the settings. Actual CPU and GPU load depends on the device.
 
-## Datenquellen und Privatheit
+## Data Sources and Privacy
 
-Standardmäßig werden diese Ordner gelesen:
+These folders are read by default:
 
-| Tool | Datenquelle |
+| Tool | Data source |
 | --- | --- |
-| Claude Code | `%USERPROFILE%\.claude\projects` inklusive `subagents`; Limits zusätzlich aus `%USERPROFILE%\.claude.json` und, falls eingerichtet, aus `%USERPROFILE%\.claude\session-atlas-limits.json` |
-| Codex | `%USERPROFILE%\.codex\sessions` und `archived_sessions` |
+| Claude Code | `%USERPROFILE%\.claude\projects`, including `subagents`; limits additionally come from `%USERPROFILE%\.claude.json` and, when configured, `%USERPROFILE%\.claude\session-atlas-limits.json` |
+| Codex | `%USERPROFILE%\.codex\sessions` and `archived_sessions` |
 
-`CLAUDE_CONFIG_DIR` und `CODEX_HOME` überschreiben das jeweilige Stammverzeichnis beim ersten Start. Weitere absolute Quellordner lassen sich in den Einstellungen ergänzen (auch erreichbare UNC-/WSL-Verzeichnisse). Daten auf anderen Rechnern oder im Browser werden nicht automatisch erfasst.
+`CLAUDE_CONFIG_DIR` and `CODEX_HOME` override the respective root directory on first launch. Additional absolute source folders can be added in the settings, including accessible UNC or WSL directories. Data on other computers or in the browser is not collected automatically.
 
-Die Dateien werden **nur gelesen**. Kein Zugriff auf Zugangsdaten. Prompts und Antworten werden beim Parsen verworfen. Aus `.claude.json` werden ausschließlich Plan, Messzeitpunkt und die beiden Limitfenster gelesen; Account-Kennung, Projektliste und Prompt-Historie derselben Datei bleiben ungelesen und werden **nicht** zwischengespeichert. Die optionale Statusline-Bridge ist der einzige Teil, der überhaupt in der Claude-Konfiguration schreibt: Claude Code ruft sie beim Rendern der Statusline auf, sie legt ausschließlich den Limitblock in `session-atlas-limits.json` ab und verwirft Modell, Arbeitsordner, Branch und alle übrigen Felder ihrer Eingabe. Der Server selbst schreibt nie in die Quellordner. Der lokale Cache enthält Nutzungsereignisse, Kontextproben, Session-IDs, Metadaten wie Arbeitsordner/Branch/Sessiontitel und zuletzt gemeldete Codex-Limits.
+The files are **read-only**. Credentials are never accessed. Prompts and responses are discarded during parsing. From `.claude.json`, only the plan, measurement time, and two limit windows are read; the account identifier, project list, and prompt history in the same file remain unread and are **not** cached. The optional status-line bridge is the only component that writes to Claude configuration at all: Claude Code invokes it when rendering the status line, it writes only the limit block to `session-atlas-limits.json`, and it discards the model, working directory, branch, and every other input field. The server itself never writes to source folders. The local cache contains usage events, context samples, session IDs, metadata such as working directory, branch, and session title, and the most recently reported Codex limits.
 
-App-Daten liegen in einem versionierten Satz unter `.local/states/<id>/`; `.local/active-state.json` verweist atomar auf den aktiven Satz. Dazu gehören `usage-cache.json`, `settings.json`, `model-prices.json` und `price-history.json`. Bestehende flache Dateien werden beim ersten Start in einen initialen Satz kopiert. Der Server ist ausschließlich an `127.0.0.1` gebunden; fremde Origins und Änderungen ohne lokalen Sitzungstoken werden abgewiesen.
+App data is stored in a versioned set under `.local/states/<id>/`; `.local/active-state.json` points atomically to the active set. It includes `usage-cache.json`, `settings.json`, `model-prices.json`, and `price-history.json`. Existing flat files are copied into an initial set on first launch. The server binds exclusively to `127.0.0.1`; foreign origins and changes without a local session token are rejected.
 
-Neue Dateiinhalte werden ab dem letzten vollständig gelesenen Zeilenende verarbeitet. Unveränderte Dateien werden anhand ihrer Metadaten geprüft und nicht geöffnet. Bei geänderten Dateien wird der gesamte bereits übernommene Inhalt per SHA-256 geprüft, bevor neue Zeilen verarbeitet werden; neu geschriebene Dateien werden so auch bei gewachsener Dateigröße erkannt. Bis zu vier Dateien werden gleichzeitig verarbeitet. Ungültige vollständige Zeilen werden übersprungen und gezählt; eine gerade geschriebene Schlusszeile wird beim nächsten Scan vervollständigt. Nutzungsdaten gelöschter Quelldateien bleiben im Cache historisch verfügbar. Entfernte Datenquellen fließen nicht mehr in Auswertungen ein. Für einen vollständigen Neuimport: App beenden und `.local/usage-cache.json` entfernen.
+New file contents are processed from the last fully read line ending. Unchanged files are checked using their metadata and are not opened. For changed files, all previously imported content is verified with SHA-256 before new lines are processed; this also detects files rewritten while their size increased. Up to four files are processed concurrently. Invalid complete lines are skipped and counted; a final line still being written is completed during the next scan. Usage data from deleted source files remains available historically in the cache. Removed data sources are no longer included in analytics. For a complete reimport, exit the app and remove `.local/usage-cache.json`.
 
-Git-Repositories werden anhand der `.git`-Metadaten erkannt, Worktrees über `commondir` zugeordnet. Nicht mehr vorhandene Projektordner bleiben anhand ihres protokollierten Arbeitsordners auswertbar.
+Git repositories are detected from their `.git` metadata, and worktrees are associated through `commondir`. Project folders that no longer exist remain available for analysis through their logged working directory.
 
-### Claude-Limits aktuell halten (optional)
+### Keeping Claude Limits Current (Optional)
 
-Claude Code schreibt `cachedUsageUtilization` nur, wenn es die Werte selbst abruft, nicht bei jeder Antwort. Der Messwert kann dadurch mehrere Tage alt sein. Die mitgelieferte Bridge hängt sich an die dokumentierte Statusline-Schnittstelle und hinterlegt bei jedem Rendern einen frischen Wert. Dafür in der `settings.json` von **Claude Code** eintragen:
+Claude Code writes `cachedUsageUtilization` only when it retrieves the values itself, not after every response. A measurement may therefore be several days old. The included bridge hooks into the documented status-line interface and stores a fresh value on every render. Add the following to the **Claude Code** `settings.json`:
 
 ```json
-"statusLine": { "command": "node \"C:\\Pfad\\zu\\Session-Atlas\\bridge\\atlas-statusline.mjs\"" }
+"statusLine": { "command": "node \"C:\\Path\\to\\Session-Atlas\\bridge\\atlas-statusline.mjs\"" }
 ```
 
-Wer bereits eine Statusline nutzt, stellt den bisherigen Befehl dahinter. Die Bridge reicht die unveränderte Eingabe weiter und überlässt ihm die Ausgabe:
+If you already use a status line, place the existing command after the bridge. The bridge forwards the input unchanged and leaves output generation to that command:
 
 ```powershell
-node "C:\Pfad\zu\Session-Atlas\bridge\atlas-statusline.mjs" -- bash mein-skript.sh
+node "C:\Path\to\Session-Atlas\bridge\atlas-statusline.mjs" -- bash my-script.sh
 ```
 
-Mit `--quiet` schreibt sie nur die Datei und gibt nichts aus. `ATLAS_RATE_LIMIT_FILE` verschiebt die Zieldatei. Pro Statusline-Rendern startet ein kurzer Node-Prozess; wie oft das geschieht, steuert die Claude-Code-Einstellung `statusLine.refreshInterval`. Fehler bleiben folgenlos: Bei ungültiger Eingabe, fehlenden Limitfeldern oder nicht startbarem Folgebefehl schreibt die Bridge nichts und endet mit Code 0, damit die Statusline nicht bricht. Den erwarteten Pfad und den aktuellen Status zeigt die App unter **Einstellungen → Claude-Limits aktuell halten**.
+With `--quiet`, it only writes the file and produces no output. `ATLAS_RATE_LIMIT_FILE` changes the destination file. Each status-line render starts a short-lived Node process; the Claude Code setting `statusLine.refreshInterval` controls how often this happens. Errors are harmless: with invalid input, missing limit fields, or a follow-up command that cannot be started, the bridge writes nothing and exits with code 0 so the status line does not break. The app shows the expected path and current status under **Settings → Keep Claude Limits Current**.
 
-## Zählung und bekannte Grenzen
+## Counting and Known Limitations
 
-### Preise per Button aktualisieren
+### Updating Prices with the Button
 
-Unter **Einstellungen → Modellpreise aktualisieren → Preise aktualisieren** lädt die App die öffentlichen Kataloge von [LiteLLM](https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json) und [models.dev](https://models.dev/api.json). ccusage muss dafür nicht installiert sein. Es werden ausschließlich Preisdateien heruntergeladen, keine Sessiondaten übertragen.
+Under **Settings → Update Model Prices → Update Prices**, the app downloads the public catalogs from [LiteLLM](https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json) and [models.dev](https://models.dev/api.json). ccusage does not need to be installed. Only pricing files are downloaded; no session data is transmitted.
 
-Die Preise werden im aktiven lokalen Datenstand gespeichert und beim nächsten Start offline geladen. Manuelle Preise haben Vorrang vor Online-Preisen; die mitgelieferte Tabelle bleibt als Rückfall für sonst unbekannte Modelle verfügbar. Neuere Quellabrufe haben Vorrang, bei gleichzeitigem Abruf LiteLLM. Bei einem Quellfehler wird die andere Quelle verwendet und eine Meldung angezeigt; bei vollständigem Fehlschlag bleiben die bisherigen Preise erhalten. Abrufzeitpunkte und Modellanzahl stehen beim Button. Der Abrufzeitpunkt ist kein bestätigtes Änderungsdatum der Anbieterpreise.
+Prices are stored in the active local data set and loaded offline on the next launch. Manual prices take precedence over online prices; the bundled table remains available as a fallback for otherwise unknown models. Newer source fetches take precedence, with LiteLLM preferred when both are fetched at the same time. If one source fails, the other is used and a message is displayed; if both fail, existing prices are preserved. Fetch times and model counts appear next to the button. A fetch time is not a confirmed date on which provider prices changed.
 
-Jede wirksame Preisänderung erzeugt einen unveränderlichen lokalen Preisstand mit Gültigkeitsbeginn und Regelversion. „Aktuelle Preise“ bewertet weiterhin alle Ereignisse mit dem derzeit wirksamen Stand. „Historisch hinterlegte Preise“ wählt für jedes Ereignis den zuletzt lokal gültigen Stand; Zeiten vor dem ersten Stand bleiben ausdrücklich unbekannt. Ein manuell gesetzter Gültigkeitsbeginn kann zurückreichen, ist aber keine Bestätigung des damaligen Anbieterpreises. Der Button aktualisiert die Standard-Tokenpreise, nicht automatisch die Programmlogik für Fast-Modi oder Kontextaufschläge. Fehlende benötigte Preiskategorien bleiben unbekannt. Es gibt keinen automatischen Hintergrundabruf.
+Every effective price change creates an immutable local pricing snapshot with an effective date and rule version. “Current Prices” continues to value all events using the currently active snapshot. “Historically Recorded Prices” selects the most recently effective local snapshot for each event; times before the first snapshot remain explicitly unknown. A manually specified effective date can extend into the past, but it does not confirm the provider price at that time. The button updates standard token prices, not the program logic for fast modes or context surcharges. Missing required pricing categories remain unknown. There is no automatic background fetch.
 
-### Backup und Wiederherstellung
+### Backup and Restore
 
-Unter **Einstellungen → Backup & Wiederherstellung** erzeugt die App eine komprimierte `.json.gz`-Sicherung. Sie enthält den Nutzungscache, Einstellungen, aktuelle Preise, Preisgeschichte und alle weiteren vorhandenen lokalen Organisationsdaten. Sitzungstoken, Autostart und Original-Logs gehören nicht dazu. Pfade und Sessiontitel sind persönliche Metadaten und bleiben im Backup lesbar; die Datei entsprechend geschützt aufbewahren.
+Under **Settings → Backup & Restore**, the app creates a compressed `.json.gz` backup. It contains the usage cache, settings, current prices, pricing history, and all other available local organizational data. Session tokens, startup configuration, and original logs are excluded. Paths and session titles are personal metadata and remain readable in the backup, so protect the file accordingly.
 
-Beim Import werden Container-Version, erlaubte Dateitypen, komprimierte und entpackte Größe sowie jede SHA-256-Prüfsumme geprüft. Erst danach erscheint die konkrete Vorschau. Eine bestätigte Wiederherstellung wird in einen neuen Datenstand geschrieben und mit einem atomaren Zeiger aktiviert; parallele Scans und Einstellungen sind währenddessen blockiert. Der vorherige Stand bleibt zusätzlich als gzip-Rückfall unter `.local/recovery/` erhalten. Gesicherte Historie funktioniert ohne Original-Logs. Auf einem anderen Rechner lassen sich fehlende Log-Wurzeln optional zuordnen, damit ein späterer Scan dieselben Sessions aktualisiert statt sie doppelt einzulesen.
+During import, the container version, allowed file types, compressed and uncompressed sizes, and every SHA-256 checksum are verified. Only then is the specific preview shown. A confirmed restore is written to a new data set and activated with an atomic pointer; concurrent scans and settings changes are blocked during the operation. The previous state is additionally preserved as a gzip recovery snapshot under `.local/recovery/`. Backed-up history works without the original logs. On another computer, missing log roots can optionally be remapped so a later scan updates the same sessions instead of importing duplicates.
 
-Claude-Antworten werden anhand der Message-ID dedupliziert, Streaming-Chunks zusammengeführt. Cache-Tokens sind bei Claude zusätzliche Input-Kategorien. Codex-Caches sind bereits in `input_tokens` enthalten und werden entsprechend getrennt. Reasoning gehört zum Output und wird nicht doppelt berechnet.
+Claude responses are deduplicated by message ID, and streaming chunks are merged. Claude cache tokens are additional input categories. Codex cache tokens are already included in `input_tokens` and are separated accordingly. Reasoning is part of the output and is not counted twice.
 
-Der Kontextverlauf ist von den Kosten- und Token-Summen getrennt. Bei Claude ergibt sich eine Probe aus den protokollierten Input-, Cache-Lese- und Cache-Schreibkategorien einer Antwort; bei Codex aus `last_token_usage` und dem ausdrücklich gelieferten `model_context_window`. Das ist der vom jeweiligen Logformat beobachtbare Antwortkontext, keine Rekonstruktion nicht protokollierter Zwischenzustände. Ein bloßer Rückgang wird nicht als Komprimierung bezeichnet. Alte oder entfernte Logs ohne diese Felder liefern weiterhin nur den letzten bekannten Stand oder keinen Verlauf.
+The context timeline is separate from cost and token totals. For Claude, a sample consists of the logged input, cache-read, and cache-write categories of a response; for Codex, it comes from `last_token_usage` and the explicitly supplied `model_context_window`. This is the response context observable in the respective log format, not a reconstruction of unlogged intermediate states. A decrease alone is not labeled as compaction. Old or removed logs without these fields continue to provide only the last known state or no timeline at all.
 
-Neuere Codex-Logs enthalten eindeutige `token_usage_record`-Einträge pro Antwort. Diese haben innerhalb einer Datei Vorrang vor den parallel geschriebenen kumulativen Snapshots. Ältere Logs verwenden die Differenz von `total_token_usage`; unveränderte wiederholte Snapshots zählen nicht erneut. Geerbte Elternereignisse vor dem Sessionbeginn bzw. mit anderer Thread-ID werden ausgeschlossen. Seltene gemischte Logs, in denen nur ein Teil der Laufzeit Antwortdatensätze enthält, können deshalb weniger Nutzungsereignisse ausweisen. Alte Logs ohne Nutzungsfelder liefern keine nachträglich rekonstruierbaren Tokenzahlen.
+Newer Codex logs contain unique `token_usage_record` entries for each response. Within a file, these take precedence over the cumulative snapshots written alongside them. Older logs use the difference between `total_token_usage` values; unchanged repeated snapshots are not counted again. Inherited parent events from before the session started or with a different thread ID are excluded. Rare mixed logs in which response records exist for only part of the runtime may therefore report fewer usage events. Old logs without usage fields cannot provide retrospectively reconstructed token counts.
 
-Die App verwendet keine undokumentierten Account-Endpunkte oder OAuth-Zugangsdaten. Limits beider Tools sind **zuletzt gemessene**, accountweite Werte; ohne neue Aktivität des jeweiligen Tools werden sie nicht frischer. Claude Code schreibt `cachedUsageUtilization` nur, wenn es die Werte selbst abruft — nicht bei jeder Antwort. Der Messwert kann daher mehrere Tage alt sein; die optionale Statusline-Bridge hält ihn aktuell. Ein abgelaufenes Fenster wird als unbekannt ausgewiesen, nicht als 0 %. In den Session-Logs selbst stehen die Prozentwerte weiterhin nicht. Mehrere Konten unter denselben Quellordnern können nicht zuverlässig getrennt werden.
+The app does not use undocumented account endpoints or OAuth credentials. Limits for both tools are **most recently measured**, account-wide values; without new activity in the respective tool, they do not become more current. Claude Code writes `cachedUsageUtilization` only when it retrieves the values itself—not after every response. A measurement may therefore be several days old; the optional status-line bridge keeps it current. An expired window is reported as unknown, not 0%. Percentage values are still not included in the session logs themselves. Multiple accounts under the same source folders cannot be reliably separated.
 
-Kosten sind **API-Gegenwerte in USD, keine Abo-Rechnung**. Preisstand: 11.09.2026. Cache-TTL, bekannte Fast-Tarife und bekannte Kontextaufschläge werden berücksichtigt. Historische Preiswechsel, Kontorabatte, regionale Besonderheiten und zusätzliche Server-Toolgebühren können abweichen. Unbekannte Modelle (etwa interne Review-Aliasse) bekommen **keinen erfundenen Preis**. Bekannte Kostensummen sind Schätzungen und können höher ausfallen; vollständig unbekannte Kosten tragen `–`. Eigene Preise in den Einstellungen ergänzen.
+Costs are **API-equivalent values in USD, not subscription invoices**. Pricing snapshot: September 11, 2026. Cache TTL, known fast-mode rates, and known context surcharges are taken into account. Historical price changes, account discounts, regional differences, and additional server-tool fees may vary. Unknown models, such as internal review aliases, receive **no invented price**. Known cost totals are estimates and may be higher; entirely unknown costs display `–`. Add custom prices in the settings.
 
-Grundlagen: [ccusage-Datenformat](https://ccusage.com/guide/codex/), [OpenAI-Preise](https://developers.openai.com/api/docs/pricing), [Anthropic-Preise](https://platform.claude.com/docs/en/about-claude/pricing). ccusage ist eine hilfreiche unabhängige Vergleichsmöglichkeit (`npx ccusage`), aber keine Laufzeitabhängigkeit dieser App.
+References: [ccusage data format](https://ccusage.com/guide/codex/), [OpenAI pricing](https://developers.openai.com/api/docs/pricing), [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing). ccusage is a useful independent comparison option (`npx ccusage`) but is not a runtime dependency of this app.
 
-## An Freunde und Kollegen weitergeben
+## Sharing with Friends and Colleagues
 
 ```powershell
 npm run package
 ```
 
-Erstellt **`dist/Session-Atlas-portable.zip`** direkt mit Node, ohne weitere Programme. Das ZIP enthält ausschließlich Programmdateien, **keinen Cache, keine Sessiondaten und keine persönlichen Einstellungen**. ZIP weitergeben, in einen beschreibbaren Ordner entpacken, `Start.cmd` starten. Nicht den gesamten Arbeitsordner inklusive `.local` weitergeben.
+This creates **`dist/Session-Atlas-portable.zip`** directly with Node and requires no other programs. The ZIP contains only program files, with **no cache, session data, or personal settings**. Share the ZIP, extract it into a writable folder, and start `Start.cmd`. Do not share the entire working directory, including `.local`.
 
-Die Autostart-Verknüpfung verweist auf den aktuellen Ordner. Nach dem Verschieben in der App aus- und wieder einschalten. Das Öffnen von PowerShell beim Autostart erfolgt mit verborgenem Fenster und ohne Änderung der Execution Policy.
+The startup shortcut points to the current folder. After moving the app, disable and re-enable startup in the app. PowerShell is opened at startup with a hidden window and without changing the execution policy.
 
-## Konfiguration und Entwicklung
+## Configuration and Development
 
 ```powershell
 $env:ATLAS_PORT = '4318'
-$env:ATLAS_DATA_DIR = 'C:\Pfad\zu\Atlas-Daten'
+$env:ATLAS_DATA_DIR = 'C:\Path\to\Atlas-Data'
 node server.mjs
 ```
 
-Der Standardport ist 4317; `ATLAS_DATA_DIR` erlaubt einen anderen beschreibbaren Cache-/Einstellungsordner. Prozessumgebungsvariablen gelten nur für den jeweiligen Start; für dauerhafte Konfiguration über Autostart müssen sie in der Windows-Benutzerumgebung verfügbar sein.
+The default port is 4317; `ATLAS_DATA_DIR` allows a different writable cache and settings folder. Process environment variables apply only to the corresponding launch; for persistent startup configuration, they must be available in the Windows user environment.
 
 ```powershell
 npm test
 ```
 
-Tests für Parser, Deduplizierung, kumulative Resets, Cachekosten, inkrementelles Einlesen, Wiederherstellung, beschädigte Zeilen und Worktree-Zuordnung. Server mit Node-Bordmitteln, UI mit HTML/CSS/JavaScript; kein Build erforderlich.
+Tests cover parsers, deduplication, cumulative resets, cache costs, incremental reads, restoration, malformed lines, and worktree association. The server uses built-in Node functionality; the UI uses HTML, CSS, and JavaScript. No build step is required.
 
-Mit `node scripts/benchmark-scan.mjs` lässt sich die Scanleistung auf künstlichen Logs messen, ohne persönliche Daten zu lesen oder den Anwendungscache zu verändern. Der Benchmark prüft auch die Gleichheit der Sessioninhalte. Messverfahren, Vergleichswerte und Grenzen stehen in [Scan-Performance](docs/scan-performance.md).
+Use `node scripts/benchmark-scan.mjs` to measure scan performance on synthetic logs without reading personal data or changing the application cache. The benchmark also verifies that session contents remain identical. The methodology, comparison results, and limitations are documented in [Scan Performance](docs/scan-performance.md).

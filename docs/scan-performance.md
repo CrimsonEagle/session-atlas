@@ -1,57 +1,57 @@
-# Scan-Performance
+# Scan Performance
 
-Stand: 14. September 2026. Die Optimierung baut auf den Korrekturen zur Erkennung neu geschriebener Logs und zur sessionweiten Codex-Deduplizierung auf.
+Status: September 14, 2026. The optimization builds on the fixes for detecting newly written logs and session-wide Codex deduplication.
 
-## Ursache und Änderungen
+## Cause and Changes
 
-Der vorherige Scan öffnete jede gefundene Datei, rief `handle.stat()` auf und schloss sie wieder – auch bei vollständig unveränderten Logs. Diese Zugriffe liefen nacheinander. Bei geänderten Dateien wurden außerdem sämtliche historischen Ereignisse tief kopiert und beim Einlesen für jede einzelne Zeile Hash-Updates ausgeführt.
+The previous scanner opened every discovered file, called `handle.stat()`, and closed it again—even for completely unchanged logs. These accesses ran sequentially. For changed files, it also deep-copied all historical events and performed hash updates for every individual line while reading.
 
-Der optimierte Scan:
+The optimized scanner:
 
-- prüft gecachte Dateien zuerst mit `fs.stat()` und öffnet sie nur bei Änderungen;
-- führt höchstens vier Dateiverarbeitungen gleichzeitig aus und übernimmt die Ergebnisse in der ursprünglichen Reihenfolge, damit Duplikate nicht zufällig anders ausgewählt werden;
-- verarbeitet identische, über mehrere Quellordner gefundene Pfade nur einmal;
-- teilt gleichzeitig angefragte Repository-Auflösungen desselben Arbeitsordners;
-- kopiert beim Anhängen nur die Container der Parser-Ereignisse, da der Parser deren Einträge ersetzt; alte Zustände bleiben dadurch auch bei Fehlern erhalten;
-- liest mit 512-KiB-Puffern, vermeidet unnötige Pufferkopien und aktualisiert den Hash für vollständige Zeilen gemeinsam je Puffer.
+- checks cached files with `fs.stat()` first and opens them only when they have changed;
+- processes no more than four files concurrently and applies the results in their original order so duplicate selection does not change nondeterministically;
+- processes identical paths found in multiple source folders only once;
+- shares concurrent repository-resolution requests for the same working directory;
+- copies only the parser-event containers when appending because the parser replaces their entries; this also preserves old state when errors occur;
+- reads with 512 KiB buffers, avoids unnecessary buffer copies, and updates the hash for complete lines once per buffer.
 
-Die vollständige SHA-256-Prüfung des bereits eingelesenen Präfixes geänderter Dateien bleibt erhalten. Es werden keine Stichproben verwendet. Prüfung und Einlesen erfolgen über denselben Dateihandle. Zusätzlich werden bei neu importierten Dateiständen `ctime`, Dateikennung und Gerät gespeichert und in die Erkennung unveränderter Dateien einbezogen. Bestehende Version-3-Caches bleiben lesbar; fehlende zusätzliche Metadaten werden beim nächsten Dateiimport ergänzt.
+The full SHA-256 verification of the already-read prefix of changed files remains in place. No sampling is used. Verification and reading use the same file handle. Newly imported file states also store `ctime`, the file identifier, and the device and include them when detecting unchanged files. Existing version 3 caches remain readable; missing additional metadata is added on the next file import.
 
-## Vergleichsmessung
+## Benchmark
 
-Künstliche Daten: 193 JSONL-Dateien, 16.384 Ereignisse, ungefähr 30,7 MiB. Eine Datei mit ungefähr 9,2 MiB wächst für den Append-Fall um ein Ereignis. Die Messung lief unter Windows im selben Arbeitskontext mit der bisherigen und der optimierten Implementierung; die Ausführungsreihenfolge wurde zwischen Durchläufen gewechselt.
+Synthetic data: 193 JSONL files, 16,384 events, approximately 30.7 MiB. For the append case, one file of approximately 9.2 MiB grows by one event. The benchmark ran on Windows in the same working environment with the previous and optimized implementations; the execution order alternated between runs.
 
-| Szenario | Vorher, Gesamtzeit | Optimiert, Gesamtzeit | Vorher, UI-Scanzeit | Optimiert, UI-Scanzeit |
+| Scenario | Previous, total time | Optimized, total time | Previous, UI scan time | Optimized, UI scan time |
 | --- | ---: | ---: | ---: | ---: |
-| Erstimport ohne Anwendungscache | 258,28 ms | 145,34 ms | 230 ms | 127 ms |
-| Folgeaktualisierung ohne Änderungen | 63,78 ms | 9,03 ms | 59 ms | 4 ms |
-| Erster Scan nach Laden des Caches | 61,32 ms | 9,72 ms | 57 ms | 4 ms |
-| Folgeaktualisierung mit angehängter Antwort | 94,06 ms | 41,78 ms | 79 ms | 26 ms |
+| Initial import without application cache | 258.28 ms | 145.34 ms | 230 ms | 127 ms |
+| Subsequent refresh without changes | 63.78 ms | 9.03 ms | 59 ms | 4 ms |
+| First scan after loading the cache | 61.32 ms | 9.72 ms | 57 ms | 4 ms |
+| Subsequent refresh with an appended response | 94.06 ms | 41.78 ms | 79 ms | 26 ms |
 
-Median aus jeweils drei Durchläufen; bei unveränderten Dateien aus 21 Scans. Die Gesamtzeit umfasst `Store.scan()` einschließlich Cache-Schreiben und Snapshot-Erzeugung. Die bisherige UI-Metrik `stats.durationMs` endet bereits vor diesen beiden Schritten; ihre Bedeutung wurde nicht verändert. Das Laden des Caches vor dem Neustart-Szenario ist nicht Teil der angegebenen Scanzeit. HTTP-Übertragung und Browser-Rendering sind ebenfalls nicht enthalten.
+Median of three runs each; for unchanged files, 21 scans. Total time includes `Store.scan()`, including cache writes and snapshot generation. The existing UI metric `stats.durationMs` ends before those two steps; its meaning has not changed. Loading the cache before the restart scenario is not included in the reported scan time. HTTP transfer and browser rendering are also excluded.
 
-„Erstimport“ bedeutet einen leeren Anwendungscache, nicht einen kalten Betriebssystem-Dateicache. Die Werte beschreiben diesen synthetischen Vergleich und sind keine Zusage für andere Rechner oder Datenmengen. In beiden Implementierungen wurden dieselben Mengen gelesen: unverändert 0 Bytes, beim Anhängen weiterhin das vollständige relevante Präfix. Die normalisierten Sessioninhalte einschließlich Ereignissen und Kosten waren in allen verglichenen Durchläufen identisch.
+“Initial import” means an empty application cache, not a cold operating-system file cache. These values describe this synthetic comparison and are not a guarantee for other computers or data volumes. Both implementations read the same amounts: 0 bytes for unchanged files and the full relevant prefix for the append case. The normalized session content, including events and costs, was identical in all compared runs.
 
-## Reproduzieren
+## Reproducing the Benchmark
 
 ```powershell
 node scripts/benchmark-scan.mjs
 ```
 
-Ein optionales Argument erlaubt den Vergleich mit einer zweiten Store-Implementierung:
+An optional argument lets you compare against a second store implementation:
 
 ```powershell
-node scripts/benchmark-scan.mjs C:\Pfad\zur\Vergleichsversion\store.mjs
+node scripts/benchmark-scan.mjs C:\Path\to\comparison-version\store.mjs
 ```
 
-Die Vergleichsdatei muss `Store` exportieren und ihre relativen Imports korrekt auflösen. Der Benchmark erstellt ausschließlich künstliche Logs und Cachedateien in einem eigenen temporären Ordner und entfernt diesen anschließend. Persönliche Sessiondateien und der laufende Server werden nicht verwendet.
+The comparison file must export `Store` and correctly resolve its relative imports. The benchmark creates only synthetic logs and cache files in a dedicated temporary folder and removes it afterward. Personal session files and the running server are not used.
 
-## Absicherung und Grenzen
+## Safeguards and Limitations
 
-Die vollständige Testsuite besteht mit 51 Tests. Zusätzliche Regressionstests prüfen Hashes über mehrere Puffer samt beschädigten Zeilen und geteilten UTF-8-Zeichen, Veränderungen mitten in einem gewachsenen Log nach Cache-Neustart, unveränderte alte Zustände bei fehlgeschlagenen Dateiupdates sowie deterministische Duplikatbehandlung trotz überlappender Quellordner und unterschiedlicher Abschlusszeiten.
+The full test suite passes with 51 tests. Additional regression tests cover hashes spanning multiple buffers with malformed lines and split UTF-8 characters, changes in the middle of a growing log after a cache restart, preservation of unchanged old state when file updates fail, and deterministic duplicate handling despite overlapping source folders and different completion times.
 
-Die Erkennung unveränderter Dateien beruht weiterhin auf Dateisystem-Metadaten. Eine Inhaltsänderung, die sämtliche verglichenen Metadaten unverändert lässt, lässt sich ohne erneutes Lesen nicht erkennen. Die Optimierung schwächt die bisherige Prüfung nicht ab; zusätzliche Metadaten verbessern sie für neu eingelesene Zustände.
+Detection of unchanged files still relies on file-system metadata. A content change that leaves all compared metadata unchanged cannot be detected without reading the file again. The optimization does not weaken the previous verification; additional metadata improves it for newly imported states.
 
-Bei stark wachsenden, sehr großen Logs bleibt die vollständige Präfixprüfung ein Aufwand proportional zur bereits eingelesenen Dateigröße. Diesen Aufwand durch bloße Stichproben zu ersetzen würde die Erkennung von Änderungen in der Dateimitte schwächen. Sehr große Auswertungen können außerdem weiterhin durch das Schreiben des gesamten JSON-Caches und die Snapshot-Erzeugung begrenzt sein.
+For very large and rapidly growing logs, full prefix verification still requires work proportional to the file size already read. Replacing it with sampling alone would weaken detection of changes in the middle of a file. Very large datasets can also remain constrained by writing the entire JSON cache and generating snapshots.
 
-Der laufende Server muss nach einem Codeupdate neu gestartet werden. Ein erneuter Aufruf von `Start.cmd` allein öffnet bei bereits laufendem Server nur dessen bestehende Instanz; zum Übernehmen der Änderungen zuerst „App vollständig beenden“ verwenden und anschließend starten.
+The running server must be restarted after a code update. If the server is already running, invoking `Start.cmd` again only opens the existing instance. To apply changes, first use “Exit App Completely,” then start it again.

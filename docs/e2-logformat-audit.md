@@ -1,24 +1,24 @@
-# E2 – Audit der Aufgabenbeziehungen
+# E2 – Task-Relationship Audit
 
-Stand: 15. September 2026
+Status: September 15, 2026
 
-Die Implementierung verwendet ausschließlich explizite, im jeweiligen Sitzungsformat belegte Beziehungen. Inhalte von Prompts oder Antworten werden dafür weder gelesen noch gespeichert.
+The implementation uses only explicit relationships supported by the respective session format. Prompt and response content is neither read nor stored for this purpose.
 
-| Quelle | Feld | Bedeutung | Behandlung |
+| Source | Field | Meaning | Handling |
 | --- | --- | --- | --- |
-| Codex `session_meta` | `payload.parent_thread_id` | Direkte übergeordnete Aufgabe | Als Parent-Beziehung gespeichert |
-| Codex `session_meta` | `payload.thread_source = subagent` | Delegierte Unteraufgabe | Beziehungstyp `subagent` |
-| Codex `session_meta` | `payload.thread_source = guardian_review` | Automatische Prüfaufgabe | Beziehungstyp `guardian_review` |
-| Codex `session_meta` | `payload.forked_from_id` | Abzweigung einer Aufgabe | Separat als `fork` gespeichert, nicht als delegierte Unteraufgabe summiert |
-| Claude-Nachricht | `parentUuid` | Vorherige Nachricht derselben Sitzung | Nicht als Aufgabenbeziehung interpretiert |
+| Codex `session_meta` | `payload.parent_thread_id` | Direct parent task | Stored as a parent relationship |
+| Codex `session_meta` | `payload.thread_source = subagent` | Delegated subtask | Relationship type `subagent` |
+| Codex `session_meta` | `payload.thread_source = guardian_review` | Automated review task | Relationship type `guardian_review` |
+| Codex `session_meta` | `payload.forked_from_id` | Fork of a task | Stored separately as `fork`; not counted as a delegated subtask |
+| Claude message | `parentUuid` | Previous message in the same session | Not interpreted as a task relationship |
 
-## Grenzen und Fallbacks
+## Limitations and Fallbacks
 
-- Fehlt eine referenzierte Parent-Sitzung lokal, bleibt die Beziehung erhalten und kann in der Oberfläche als nicht zugeordnet angezeigt werden.
-- Beziehungen werden nicht aus Zeitnähe, Dateipfaden oder Namen geraten.
-- Die Baumdarstellung muss Zyklen und Selbstreferenzen defensiv abfangen, auch wenn die geprüften Codex-Logs keine solchen Fälle enthielten.
-- Für die derzeit geprüften Claude-Logs existiert kein belastbares sitzungsübergreifendes Parent-Feld. Claude-Sitzungen bleiben daher flach, bis ein dokumentiertes Formatmerkmal vorliegt.
+- If a referenced parent session is unavailable locally, the relationship is preserved and may appear as unassigned in the interface.
+- Relationships are not inferred from temporal proximity, file paths, or names.
+- The tree view must defensively handle cycles and self-references, even though the audited Codex logs contained no such cases.
+- The Claude logs reviewed so far contain no reliable cross-session parent field. Claude sessions therefore remain flat until a documented format feature becomes available.
 
 ## Migration
 
-Der Parser trägt eine eigene Versionsnummer. Ändert sich die Semantik, werden unveränderte Logdateien einmal kontrolliert neu eingelesen. Vor dem ersten Schreiben des neuen Cacheformats wird der vorhandene Cache einmalig als `*.v<version>.backup` gesichert. Der Cache enthält weiterhin nur Nutzungsmetadaten, keine Gesprächsinhalte.
+The parser has its own version number. When its semantics change, unchanged log files are re-read once in a controlled migration. Before the new cache format is written for the first time, the existing cache is backed up once as `*.v<version>.backup`. The cache continues to contain usage metadata only, with no conversation content.
