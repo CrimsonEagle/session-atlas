@@ -17,16 +17,21 @@ function tipMarkup(payload){
 // Delegated for the whole root, so re-rendered charts keep working without rebinding listeners.
 export function attachTooltips(root){
  let hideTimer=0,active=null;
+ function hideElement(element){
+  element.hidden=true;
+  if(active===element)active=null;
+ }
  function boxFor(host){
   let element=host.querySelector(':scope>.chart-tooltip');
   if(!element){element=document.createElement('div');element.className='chart-tooltip';element.setAttribute('role','tooltip');element.hidden=true;host.appendChild(element);}
   return element;
  }
  function show(target,event){
-  clearTimeout(hideTimer);
+  clearTimeout(hideTimer);hideTimer=0;
   const host=target.closest('[data-tip-host]');if(!host)return;
   let payload;try{payload=JSON.parse(target.dataset.tip);}catch{return;}
-  const element=boxFor(host);element.innerHTML=tipMarkup(payload);element.hidden=false;active=element;
+  const element=boxFor(host);if(active&&active!==element)hideElement(active);
+  element.innerHTML=tipMarkup(payload);element.hidden=false;active=element;
   const hostBox=host.getBoundingClientRect(),targetBox=target.getBoundingClientRect(),pointer=event?.type?.startsWith('pointer');
   const x=pointer?event.clientX:targetBox.left+targetBox.width/2,y=pointer?event.clientY:targetBox.top+18,half=element.offsetWidth/2;
   element.style.left=`${Math.max(half+8,Math.min(hostBox.width-half-8,x-hostBox.left))}px`;
@@ -34,14 +39,15 @@ export function attachTooltips(root){
   element.classList.toggle('below',y-hostBox.top<element.offsetHeight+20);
  }
  function hide(delay=90){
-  clearTimeout(hideTimer);if(!active)return;const element=active;active=null;
-  if(delay)hideTimer=setTimeout(()=>{element.hidden=true;},delay);else element.hidden=true;
+  clearTimeout(hideTimer);hideTimer=0;if(!active)return;const element=active;
+  if(delay)hideTimer=setTimeout(()=>{hideTimer=0;hideElement(element);},delay);else hideElement(element);
  }
  const find=event=>event.target instanceof Element?event.target.closest('[data-tip]'):null;
  root.addEventListener('pointerover',event=>{const target=find(event);if(target)show(target,event);});
- root.addEventListener('pointermove',event=>{const target=find(event);if(target)show(target,event);});
+ root.addEventListener('pointermove',event=>{const target=find(event);if(target)show(target,event);else hide(0);});
  root.addEventListener('pointerout',event=>{const target=find(event);if(target&&!target.contains(event.relatedTarget))hide();});
  root.addEventListener('pointerleave',()=>hide(0));
+ root.addEventListener('pointercancel',()=>hide(0));
  root.addEventListener('focusin',event=>{const target=find(event);if(target)show(target,event);});
  root.addEventListener('focusout',event=>{if(find(event))hide(0);});
  return ()=>hide(0);

@@ -1,6 +1,6 @@
 import {backgroundSize} from './background.js';
-import './vendor/pixi-csp-8.18.0.mjs';
-import {WebGLRenderer, Container, Graphics, Sprite, Texture, Ticker} from './vendor/pixi-8.18.0.mjs';
+import './vendor/pixi-csp-8.21.0.mjs';
+import {WebGLRenderer, Container, Graphics, Sprite, Texture, Ticker} from './vendor/pixi-8.21.0.mjs';
 
 export async function createPixiScene({document, window}) {
  // This is the app's only PixiJS scene. Disable its scheduler/event tickers;

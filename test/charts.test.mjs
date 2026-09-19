@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+ attachTooltips,
  axisLabel,
  bucketLabel,
  compareValues,
@@ -11,6 +12,24 @@ import {
  tipAttr,
  tipLabel,
 } from '../public/charts.js';
+
+class FakeElement {
+ constructor({tip=null,host=false,parent=null}={}){this.dataset=tip===null?{}:{tip:JSON.stringify(tip)};this.host=host;this.parent=parent;this.children=[];this.hidden=false;this.offsetWidth=180;this.offsetHeight=80;this.style={};this.classList={toggle:()=>{}};if(parent)parent.children.push(this);}
+ closest(selector){for(let element=this;element;element=element.parent){if(selector==='[data-tip]'&&element.dataset.tip!==undefined)return element;if(selector==='[data-tip-host]'&&element.host)return element;}return null;}
+ contains(other){for(let element=other;element;element=element.parent)if(element===this)return true;return false;}
+ querySelector(selector){return selector===':scope>.chart-tooltip'?this.children.find(child=>child.className==='chart-tooltip')||null:null;}
+ appendChild(child){child.parent=this;this.children.push(child);}
+ setAttribute(){}
+ getBoundingClientRect(){return {left:0,top:0,width:500,height:220};}
+}
+
+function tooltipFixture(){
+ const listeners={},root=new FakeElement(),firstHost=new FakeElement({host:true,parent:root}),secondHost=new FakeElement({host:true,parent:root});
+ root.addEventListener=(type,listener)=>{listeners[type]=listener;};
+ const first=new FakeElement({tip:{title:'Erstes Diagramm'},parent:firstHost}),second=new FakeElement({tip:{title:'Zweites Diagramm'},parent:secondHost}),outside=new FakeElement({parent:root});
+ const emit=(type,target,relatedTarget=null)=>listeners[type]({type,target,relatedTarget,clientX:100,clientY:100});
+ return {root,firstHost,secondHost,first,second,outside,emit};
+}
 
 const rows=[{key:'2026-09-10',codex:10,claude:0},{key:'2026-09-11',codex:0,claude:0},{key:'2026-09-12',codex:5,claude:5}];
 const format=value=>String(value);
@@ -30,6 +49,28 @@ test('every period carries a tooltip payload, an idle one included',()=>{
  assert.deepEqual(payloads[1].rows.map(([label,value])=>[label,value]),[['Codex','0'],['Claude Code','0']]);
  assert.deepEqual(payloads[2].total,['Gesamt','10']);
  assert.ok(payloads.every(payload=>payload.title));
+});
+
+test('switching chart hosts cannot leave the previous tooltip visible',()=>{
+ const originalElement=globalThis.Element,originalDocument=globalThis.document;
+ globalThis.Element=FakeElement;globalThis.document={createElement:()=>new FakeElement()};
+ try{
+  const fixture=tooltipFixture();attachTooltips(fixture.root);
+  fixture.emit('pointerover',fixture.first);const firstTooltip=fixture.firstHost.children.at(-1);assert.equal(firstTooltip.hidden,false);
+  fixture.emit('pointerout',fixture.first,fixture.outside);
+  fixture.emit('pointerover',fixture.second);const secondTooltip=fixture.secondHost.children.at(-1);
+  assert.equal(firstTooltip.hidden,true);assert.equal(secondTooltip.hidden,false);
+ }finally{globalThis.Element=originalElement;globalThis.document=originalDocument;}
+});
+
+test('moving beyond a chart target hides its tooltip even without pointerout',()=>{
+ const originalElement=globalThis.Element,originalDocument=globalThis.document;
+ globalThis.Element=FakeElement;globalThis.document={createElement:()=>new FakeElement()};
+ try{
+  const fixture=tooltipFixture();attachTooltips(fixture.root);
+  fixture.emit('pointerover',fixture.first);const tooltip=fixture.firstHost.children.at(-1);assert.equal(tooltip.hidden,false);
+  fixture.emit('pointermove',fixture.outside);assert.equal(tooltip.hidden,true);
+ }finally{globalThis.Element=originalElement;globalThis.document=originalDocument;}
 });
 
 test('selectable chart exposes bucket controls and its selected state',()=>{

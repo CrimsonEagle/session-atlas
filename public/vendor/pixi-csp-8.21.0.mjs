@@ -1,12 +1,12 @@
 /*!
- * PixiJS - v8.18.0
- * Compiled Tue, 14 Apr 2026 14:58:01 UTC
+ * PixiJS - v8.21.0
+ * Compiled Thu, 17 Sep 2026 07:42:29 UTC
  *
  * PixiJS is licensed under the MIT License.
  * http://www.opensource.org/licenses/mit-license
  */
 // Local ESM adapter: use the bundled module instead of window.PIXI.
-import * as PIXI from './pixi-8.18.0.mjs';
+import * as PIXI from './pixi-8.21.0.mjs';
 var unsafe_eval_js = (function (exports) {
     'use strict';
 
@@ -422,6 +422,7 @@ var unsafe_eval_js = (function (exports) {
 
 
 
+
     function generateShaderSyncPolyfill() {
       return syncShader;
     }
@@ -449,7 +450,7 @@ var unsafe_eval_js = (function (exports) {
               shader._uniformBindMap[i][j],
               syncData.blockIndex++
             );
-          } else if (resource instanceof PIXI.TextureSource) {
+          } else if (resource instanceof PIXI.TextureSource || resource instanceof PIXI.TextureView) {
             renderer.texture.bind(resource, syncData.textureCount);
             const uniformName = shader._uniformBindMap[i][j];
             const uniformData = programData.uniformData[uniformName];
@@ -722,7 +723,7 @@ var unsafe_eval_js = (function (exports) {
           }
         }
       }
-      return (uniforms, data, offset) => {
+      return (uniforms, data, _dataInt32, offset) => {
         for (const i in functionMap) {
           functionMap[i].func(i, data, offset + functionMap[i].offset, uniforms, uniforms[i]);
         }
@@ -1054,4 +1055,3 @@ var unsafe_eval_js = (function (exports) {
 
 })({});
 // Side-effect installation above supplies the CSP-safe renderer polyfills.
-

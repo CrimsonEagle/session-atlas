@@ -41,8 +41,8 @@ const staticFiles={'/':['index.html','text/html; charset=utf-8'],'/app.js':['app
 staticFiles['/background.js']=['background.js','text/javascript; charset=utf-8'];
 staticFiles['/background.css']=['background.css','text/css; charset=utf-8'];
 staticFiles['/pixi-background.js']=['pixi-background.js','text/javascript; charset=utf-8'];
-staticFiles['/vendor/pixi-8.18.0.mjs']=['vendor/pixi-8.18.0.mjs','text/javascript; charset=utf-8'];
-staticFiles['/vendor/pixi-csp-8.18.0.mjs']=['vendor/pixi-csp-8.18.0.mjs','text/javascript; charset=utf-8'];
+staticFiles['/vendor/pixi-8.21.0.mjs']=['vendor/pixi-8.21.0.mjs','text/javascript; charset=utf-8'];
+staticFiles['/vendor/pixi-csp-8.21.0.mjs']=['vendor/pixi-csp-8.21.0.mjs','text/javascript; charset=utf-8'];
 let mutating=false;
 const restorePlans=new Map();
 async function readBody(req,max){const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>max)throw Object.assign(Error(`Anfrage überschreitet ${Math.round(max/1024/1024)} MB.`),{statusCode:413});chunks.push(chunk);}return Buffer.concat(chunks);}
