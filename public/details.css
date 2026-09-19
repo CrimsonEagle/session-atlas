@@ -336,3 +336,5 @@ dialog:not(.detail-wide) .detail-body>.metrics .metric:nth-child(3) .metric-valu
  dialog .close,.detail-back,.detail-breakdown-row{transition:none}
  .detail-breakdown-row:hover{transform:none}
 }
+.limit-history-point.window-300>circle:first-child{stroke:var(--detail-indigo)}
+.limit-history-point.window-10080>circle:first-child{stroke:var(--detail-violet)}

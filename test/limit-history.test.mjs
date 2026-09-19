@@ -36,7 +36,25 @@ test('history view separates reset windows and reports sources',()=>{
   {id:'2',tool:'codex',windowMinutes:300,resetsAt:'2026-09-15T15:00:00Z',usedPercent:40,sourceObservedAt:'2026-09-15T11:00:00Z',source:'session-log'},
   {id:'3',tool:'codex',windowMinutes:300,resetsAt:'2026-09-16T15:00:00Z',usedPercent:10,sourceObservedAt:'2026-09-15T12:00:00Z',source:'session-log'},
   {id:'4',tool:'codex',windowMinutes:300,resetsAt:'2026-09-16T15:00:00Z',usedPercent:30,sourceObservedAt:'2026-09-15T13:00:00Z',source:'session-log'}];
- const html=limitHistoryView({history,tool:'codex',now:now+2*60*60*1000,esc:String,date:String});assert.equal((html.match(/class="limit-history-area"/g)||[]).length,2);assert.equal((html.match(/class="limit-history-line"/g)||[]).length,2);assert.doesNotMatch(html,/<circle/);assert.match(html,/Flächen enden an Resetgrenzen/);assert.match(html,/Session-Log/);assert.match(html,/<option value="30" selected>/);
+ const html=limitHistoryView({history,tool:'codex',now:now+2*60*60*1000,esc:String,date:String});assert.equal((html.match(/class="limit-history-area"/g)||[]).length,2);assert.equal((html.match(/class="limit-history-line"/g)||[]).length,2);assert.equal((html.match(/class="limit-history-point window-300"/g)||[]).length,4);assert.match(html,/data-tip=/);assert.match(html,/class="limit-history-chart-wrap" data-tip-host/);assert.match(html,/viewBox="0 0 900 274"/);assert.match(html,/Flächen enden an Resetgrenzen/);assert.match(html,/Session-Log/);assert.match(html,/<option value="30" selected>/);
+});
+
+test('interactive limit legend filters usage chart and table together',()=>{
+ const history=[
+  {id:'five-1',tool:'codex',windowMinutes:300,resetsAt:'2026-09-15T15:00:00Z',usedPercent:20,sourceObservedAt:'2026-09-15T10:00:00Z',source:'session-log'},
+  {id:'five-2',tool:'codex',windowMinutes:300,resetsAt:'2026-09-15T15:00:00Z',usedPercent:40,sourceObservedAt:'2026-09-15T11:00:00Z',source:'session-log'},
+  {id:'week-1',tool:'codex',windowMinutes:10080,resetsAt:'2026-09-22T15:00:00Z',usedPercent:60,sourceObservedAt:'2026-09-15T09:00:00Z',source:'statusline'},
+  {id:'week-2',tool:'codex',windowMinutes:10080,resetsAt:'2026-09-22T15:00:00Z',usedPercent:80,sourceObservedAt:'2026-09-15T12:00:00Z',source:'statusline'}];
+ const full=limitHistoryView({history,tool:'codex',period:'all',now,esc:String,date:String});
+ const html=limitHistoryView({history,tool:'codex',period:'all',visibleWindows:[300],now,esc:String,date:String});
+ assert.match(html,/data-limit-history-window="300" class="" aria-pressed="true"/);
+ assert.match(html,/data-limit-history-window="10080" class="is-hidden" aria-pressed="false"/);
+ assert.equal((html.match(/class="limit-history-point window-300"/g)||[]).length,2);
+ assert.doesNotMatch(html,/class="limit-history-point window-10080"/);
+ assert.doesNotMatch(html,/>Wöchentlich<\/td>/);
+ assert.match(html,/2 von 4 Messpunkten/);
+ const fiveHourPoint=markup=>markup.match(/class="limit-history-point window-300"[^>]*><circle cx="([^"]+)" cy="([^"]+)"/)?.slice(1);
+ assert.deepEqual(fiveHourPoint(html),fiveHourPoint(full));
 });
 
 test('history view limits chart and table to the selected date range',()=>{
@@ -86,4 +104,8 @@ test('cost-limit detail shows both temporal series and explains incomplete prici
  assert.match(html,/aria-label="Geschätzte nutzbare Kostenlimits im Zeitverlauf"/);assert.doesNotMatch(html,/<title id="limit-cost-title">/);
  const raw=limitHistoryView({history,sessions,tool:'codex',mode:'cost',aggregation:'raw',period:'all',now,esc:String,date:String,money:value=>`$${value.toFixed(2)}`});
  assert.match(raw,/<option value="raw" selected>Einzelmessungen<\/option>/);assert.match(raw,/2 Einzelmessungen/);assert.match(raw,/Jeder Punkt zeigt eine einzelne historische Hochrechnung/);assert.match(raw,/100%-Schätzung/);assert.doesNotMatch(raw,/2 Fenstermittel aus/);
+ const fiveOnly=limitHistoryView({history,sessions,tool:'codex',mode:'cost',period:'all',visibleWindows:[300],now,esc:String,date:String,money:value=>`$${value.toFixed(2)}`});
+ assert.match(fiveOnly,/data-limit-history-window="10080" class="is-hidden" aria-pressed="false"/);assert.doesNotMatch(fiveOnly,/class="limit-cost-series window-10080"/);assert.doesNotMatch(fiveOnly,/>Wöchentlich<\/td>/);
+ const fiveHourPath=markup=>markup.match(/class="limit-cost-series window-300"><path d="([^"]+)"/)?.[1];
+ assert.equal(fiveHourPath(fiveOnly),fiveHourPath(html));
 });
