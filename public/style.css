@@ -232,6 +232,7 @@ body{
  box-shadow:12px 0 36px rgba(20,25,62,.12);
 }
 .brand{color:#fff}
+.brand img{display:block;flex:0 0 auto;border-radius:11px;box-shadow:0 5px 16px rgba(6,10,38,.3)}
 .brand small,.sidebar .version{color:#aeb8df}
 .sidebar nav a,.sidebar-bottom>a{color:#c5ccef}
 .sidebar .nav-icon{color:#8fa2ff}
