@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {updateLimitHistory} from '../lib/limit-history.mjs';
-import {limitHistoryView} from '../public/limit-history.js';
+import {averageCostLimitWindows,estimateCostLimits,limitHistoryView} from '../public/limit-history.js';
 
 const now=Date.parse('2026-09-15T12:00:00Z');
 const limit=(used,observed='2026-09-15T12:00:00Z',reset='2026-09-15T15:00:00Z')=>({limit_id:'codex',observedAt:observed,primary:{window_minutes:300,used_percent:used,resets_at:Date.parse(reset)/1000}});
@@ -46,4 +46,44 @@ test('history view limits chart and table to the selected date range',()=>{
   {id:'new-2',tool:'codex',windowMinutes:300,resetsAt:'2026-09-15T15:00:00Z',usedPercent:40,sourceObservedAt:'2026-09-15T11:00:00Z',source:'statusline'}];
  const recent=limitHistoryView({history,tool:'codex',period:'30',now,esc:String,date:String});assert.doesNotMatch(recent,/90 %/);assert.match(recent,/2 von 3 Messpunkten/);
  const all=limitHistoryView({history,tool:'codex',period:'all',now,esc:String,date:String});assert.match(all,/90 %/);assert.match(all,/3 von 3 Messpunkten/);
+});
+
+test('cost limits are extrapolated from spend inside each provider reset window',()=>{
+ const history=[
+  {id:'five',tool:'codex',windowMinutes:300,resetsAt:'2026-09-15T15:00:00Z',usedPercent:40,sourceObservedAt:'2026-09-15T12:00:00Z',source:'session-log'},
+  {id:'week',tool:'codex',windowMinutes:10080,resetsAt:'2026-09-22T09:59:59Z',usedPercent:25,sourceObservedAt:'2026-09-15T12:00:00Z',source:'session-log'},
+  {id:'zero',tool:'codex',windowMinutes:300,resetsAt:'2026-09-15T15:00:00Z',usedPercent:0,sourceObservedAt:'2026-09-15T12:00:00Z',source:'session-log'}];
+ const sessions=[{tool:'codex',events:[
+  {time:'2026-09-15T09:59:59Z',cost:9},
+  {time:'2026-09-15T10:00:00Z',cost:1},
+  {time:'2026-09-15T11:00:00Z',cost:2},
+  {time:'2026-09-15T11:30:00Z',cost:null},
+  {time:'2026-09-15T12:00:01Z',cost:8}]}];
+ const [five,week,zero]=estimateCostLimits(history,sessions,'codex');
+ assert.equal(five.windowCost,3);assert.equal(five.estimatedLimit,7.5);assert.equal(five.unknownCosts,1);assert.equal(five.requests,3);assert.equal(five.coverage,2/3);
+ assert.equal(week.windowCost,12);assert.equal(week.estimatedLimit,48);assert.equal(week.unknownCosts,1);
+ assert.equal(zero.estimatedLimit,null);
+});
+
+test('cost estimates collapse into one arithmetic mean per reset window',()=>{
+ const points=[
+  {windowMinutes:300,resetsAt:'2026-09-15T15:00:00Z',sourceObservedAt:'2026-09-15T11:00:00Z',estimatedLimit:10,windowCost:1,usedPercent:20,coverage:.5,unknownCosts:1},
+  {windowMinutes:300,resetsAt:'2026-09-15T15:00:00Z',sourceObservedAt:'2026-09-15T12:00:00Z',estimatedLimit:14,windowCost:3,usedPercent:40,coverage:1,unknownCosts:0},
+  {windowMinutes:300,resetsAt:'2026-09-15T20:00:00Z',sourceObservedAt:'2026-09-15T18:00:00Z',estimatedLimit:20,windowCost:4,usedPercent:20,coverage:1,unknownCosts:0},
+  {windowMinutes:10080,resetsAt:'2026-09-22T10:00:00Z',sourceObservedAt:'2026-09-15T12:00:00Z',estimatedLimit:80,windowCost:8,usedPercent:10,coverage:1,unknownCosts:0}];
+ const windows=averageCostLimitWindows(points),first=windows[0];
+ assert.equal(windows.length,3);assert.equal(first.measurements,2);assert.equal(first.estimatedLimit,12);assert.equal(first.minEstimatedLimit,10);assert.equal(first.maxEstimatedLimit,14);assert.equal(first.windowCost,2);assert.equal(first.usedPercent,30);assert.equal(first.coverage,.75);assert.equal(first.incompleteMeasurements,1);assert.equal(first.sourceObservedAt,'2026-09-15T12:00:00Z');
+});
+
+test('cost-limit detail shows both temporal series and explains incomplete pricing',()=>{
+ const history=[
+  {id:'five',tool:'codex',windowMinutes:300,resetsAt:'2026-09-15T15:00:00Z',usedPercent:50,sourceObservedAt:'2026-09-15T12:00:00Z',source:'session-log'},
+  {id:'week',tool:'codex',windowMinutes:10080,resetsAt:'2026-09-22T10:00:00Z',usedPercent:25,sourceObservedAt:'2026-09-15T12:00:00Z',source:'session-log'}];
+ const sessions=[{tool:'codex',events:[{time:'2026-09-15T10:00:00Z',cost:2},{time:'2026-09-15T11:00:00Z',cost:null}]}];
+ const html=limitHistoryView({history,sessions,tool:'codex',mode:'cost',period:'all',now,esc:String,date:String,money:value=>`$${value.toFixed(2)}`});
+ assert.match(html,/arithmetischer Mittelwert/);assert.match(html,/window-300/);assert.match(html,/window-10080/);assert.match(html,/\$4\.00/);assert.match(html,/\$8\.00/);assert.match(html,/unbekannten Modellpreisen/);assert.match(html,/2 Fenstermittel aus 2 Messpunkten/);assert.match(html,/Kostenlimit/);
+ assert.match(html,/<option value="window" selected>Fenstermittel<\/option>/);
+ assert.match(html,/aria-label="Geschätzte nutzbare Kostenlimits im Zeitverlauf"/);assert.doesNotMatch(html,/<title id="limit-cost-title">/);
+ const raw=limitHistoryView({history,sessions,tool:'codex',mode:'cost',aggregation:'raw',period:'all',now,esc:String,date:String,money:value=>`$${value.toFixed(2)}`});
+ assert.match(raw,/<option value="raw" selected>Einzelmessungen<\/option>/);assert.match(raw,/2 Einzelmessungen/);assert.match(raw,/Jeder Punkt zeigt eine einzelne historische Hochrechnung/);assert.match(raw,/100%-Schätzung/);assert.doesNotMatch(raw,/2 Fenstermittel aus/);
 });
