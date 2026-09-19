@@ -28,7 +28,8 @@ export function calendarMetricValue(day,metric='tokens') {
 function monthName(date){return date.toLocaleDateString('de-DE',{month:'short'}).replace('.','');}
 function dayName(date){return date.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});}
 
-export function activityCalendarView({sessions,range,metric='tokens',selectedKey=null,rangeMode='rolling',years=[],now=Date.now(),num,compact,money}) {
+export function activityCalendarView({sessions,range,metric='tokens',selectedKey=null,rangeMode='rolling',years=[],now=Date.now(),num,compact,money,tools=['codex','claude']}) {
+ const visibleTools=tools.filter(tool=>tool==='codex'||tool==='claude'),toolNames={codex:'Codex',claude:'Claude Code'};
  const days=activityDays(sessions,range,now),metricLabel={tokens:'Tokens',cost:'API-Schätzung',requests:'Modellantworten'}[metric],format=value=>metric==='cost'?money(value):metric==='requests'?num(value):compact(value);
  const metricForTool=(tool,day)=>metric==='cost'?day.tools[tool].cost:metric==='requests'?day.tools[tool].requests:day.tools[tool].tokens;
  const rangeControls=`<select id="calendar-range" aria-label="Kalenderzeitraum"><option value="rolling" ${rangeMode==='rolling'?'selected':''}>Letzte 12 Monate</option>${years.map(year=>`<option value="${year}" ${rangeMode===String(year)?'selected':''}>Kalenderjahr ${year}</option>`).join('')}${rangeMode==='selection'?'<option value="selection" selected>Aktueller Zeitraumfilter</option>':''}</select>`;
@@ -44,7 +45,7 @@ export function activityCalendarView({sessions,range,metric='tokens',selectedKey
  const button=day=>{
   if(!day)return '<span class="calendar-day outside" aria-hidden="true"></span>';
   const value=calendarMetricValue(day,metric),unknownCost=metric==='cost'&&day.unknown>0,selected=day.key===selectedKey;
-  const payload={title:dayName(day.date),rows:[[metricLabel,format(value)],['Sessions',num(day.sessionCount)],['Codex',format(metricForTool('codex',day)),'codex'],['Claude Code',format(metricForTool('claude',day)),'claude']],note:day.future?'Liegt in der Zukunft':day.unknown?`${num(day.unknown)} Antworten ohne bekannten Preis`:value?'Anklicken, um diesen Tag auszuwählen':'Keine Aktivität protokolliert'};
+  const payload={title:dayName(day.date),rows:[[metricLabel,format(value)],['Sessions',num(day.sessionCount)],...visibleTools.map(tool=>[toolNames[tool],format(metricForTool(tool,day)),tool])],note:day.future?'Liegt in der Zukunft':day.unknown?`${num(day.unknown)} Antworten ohne bekannten Preis`:value?'Anklicken, um diesen Tag auszuwählen':'Keine Aktivität protokolliert'};
   return `<button type="button" class="calendar-day level-${level(day)}${unknownCost?' unknown-cost':''}${selected?' selected':''}${day.future?' future':''}" ${day.future?'disabled':`data-chart-bucket="${day.key}" data-chart-period="day" aria-pressed="${selected}"`} aria-label="${html(tipLabel(payload))}" ${tipAttr(payload)}><span>${day.date.getDate()}</span></button>`;
  };
  const total=totals(sessions.flatMap(session=>session.events)),active=days.filter(day=>!day.future&&day.requests).length,unknown=days.reduce((sum,day)=>sum+day.unknown,0);

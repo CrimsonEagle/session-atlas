@@ -26,9 +26,11 @@ test('HTTP API is local, rejects foreign origins/mutations, validates settings a
  assert.equal(foreignHostStatus,403);
  assert.equal((await fetch(base+'/api/settings',{method:'POST',body:'{}'})).status,403);
  const bootstrap=await(await fetch(base+'/api/bootstrap')).json();const post=(endpoint,x)=>fetch(base+endpoint,{method:'POST',headers:{'Content-Type':'application/json','X-Atlas-Token':bootstrap.token},body:JSON.stringify(x)});
+ assert.deepEqual(bootstrap.settings.hiddenProviders,[]);
  assert.equal((await post('/api/settings',{...bootstrap.settings,intervalSeconds:1})).status,400);
  assert.equal((await post('/api/settings',{...bootstrap.settings,claudeRoots:['relative/path']})).status,400);
- assert.equal((await post('/api/settings',{...bootstrap.settings,intervalSeconds:10})).status,200);
+ assert.equal((await post('/api/settings',{...bootstrap.settings,hiddenProviders:['other']})).status,400);
+ const saved=await post('/api/settings',{...bootstrap.settings,intervalSeconds:10,hiddenProviders:['claude','claude']});assert.equal(saved.status,200);assert.deepEqual((await saved.json()).settings.hiddenProviders,['claude']);
  const result=await(await post('/api/refresh',{})).json();assert.deepEqual(result.sessions,[]);assert.equal(result.stats.scanCount,1);
  const snapshot=await(await fetch(base+'/api/snapshot')).json();assert.equal(snapshot.stats.scanCount,1);assert.equal(snapshot.limitHistory,undefined);
  const history=await(await fetch(base+'/api/limit-history?tool=codex')).json();assert.deepEqual(history.history,[]);assert.equal((await fetch(base+'/api/limit-history?tool=other')).status,400);

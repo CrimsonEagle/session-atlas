@@ -20,7 +20,7 @@ const port=Number(process.env.ATLAS_PORT||4317);
 const origin=`http://127.0.0.1:${port}`;
 const token=randomBytes(32).toString('hex');
 const defaultThresholds={codex:{300:[80,95],10080:[80,95]},claude:{300:[80,95],10080:[80,95]}};
-const defaults={intervalSeconds:30,limitRetentionDays:90,limitThresholds:defaultThresholds,claudeRoots:[path.join(process.env.CLAUDE_CONFIG_DIR||path.join(os.homedir(),'.claude'),'projects')],codexRoots:[path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'sessions'),path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'archived_sessions')],prices:{},pricingMode:'current',priceEffectiveFrom:''};
+const defaults={intervalSeconds:30,hiddenProviders:[],limitRetentionDays:90,limitThresholds:defaultThresholds,claudeRoots:[path.join(process.env.CLAUDE_CONFIG_DIR||path.join(os.homedir(),'.claude'),'projects')],codexRoots:[path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'sessions'),path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'archived_sessions')],prices:{},pricingMode:'current',priceEffectiveFrom:''};
 let settings={...defaults};
 try {settings={...defaults,...JSON.parse(await fs.readFile(path.join(dataDir,'settings.json'),'utf8'))};}catch{}
 let priceHistory=new PriceHistory(path.join(dataDir,'price-history.json'));await priceHistory.load();
@@ -28,6 +28,7 @@ if(!priceHistory.snapshots.length)await priceHistory.capture({overrides:settings
 let store=new Store(path.join(dataDir,'usage-cache.json'),priceHistory);await store.load();
 function validateSettings(x) {
  if(!Number.isInteger(x.intervalSeconds)||x.intervalSeconds<10||x.intervalSeconds>3600)throw Error('Aktualisierung: 10 bis 3600 Sekunden.');
+ if(!Array.isArray(x.hiddenProviders)||x.hiddenProviders.some(provider=>!['codex','claude'].includes(provider)))throw Error('Ungültige Provider-Sichtbarkeit.');
  for(const k of ['claudeRoots','codexRoots'])if(!Array.isArray(x[k])||x[k].length>20||x[k].some(p=>typeof p!=='string'||!path.isAbsolute(p)||p.length>2000))throw Error('Bitte gültige absolute Ordnerpfade eintragen.');
  if(!x.prices||typeof x.prices!=='object'||Array.isArray(x.prices))throw Error('Preise müssen ein JSON-Objekt sein.');
  for(const [model,r] of Object.entries(x.prices))if(model.length>120||!Array.isArray(r)||r.length<3||r.length>5||r.some(v=>!Number.isFinite(v)||v<0||v>100000))throw Error('Preise: je Modell 3 bis 5 nichtnegative Zahlen.');
@@ -35,7 +36,7 @@ function validateSettings(x) {
  if(!['current','historical'].includes(x.pricingMode))throw Error('Ungültiger Bewertungsmodus.');
  if(x.priceEffectiveFrom&& !Number.isFinite(Date.parse(x.priceEffectiveFrom)))throw Error('Ungültiger Gültigkeitsbeginn für manuelle Preise.');
  const limitThresholds={};for(const tool of ['codex','claude']){limitThresholds[tool]={};for(const minutes of [300,10080]){const values=x.limitThresholds?.[tool]?.[minutes];if(!Array.isArray(values)||values.length<1||values.length>5||values.some(value=>!Number.isFinite(value)||value<=0||value>100))throw Error('Limitschwellen: 1 bis 5 Prozentwerte zwischen 1 und 100.');limitThresholds[tool][minutes]=[...new Set(values)].sort((a,b)=>a-b);}}
- return {intervalSeconds:x.intervalSeconds,limitRetentionDays:x.limitRetentionDays,limitThresholds,claudeRoots:x.claudeRoots.map(p=>path.resolve(p)),codexRoots:x.codexRoots.map(p=>path.resolve(p)),prices:x.prices,pricingMode:x.pricingMode,priceEffectiveFrom:x.priceEffectiveFrom?new Date(x.priceEffectiveFrom).toISOString():''};
+ return {intervalSeconds:x.intervalSeconds,hiddenProviders:[...new Set(x.hiddenProviders)],limitRetentionDays:x.limitRetentionDays,limitThresholds,claudeRoots:x.claudeRoots.map(p=>path.resolve(p)),codexRoots:x.codexRoots.map(p=>path.resolve(p)),prices:x.prices,pricingMode:x.pricingMode,priceEffectiveFrom:x.priceEffectiveFrom?new Date(x.priceEffectiveFrom).toISOString():''};
 }
 const staticFiles={'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript; charset=utf-8'],'/activity-calendar.js':['activity-calendar.js','text/javascript; charset=utf-8'],'/analytics-core.js':['analytics-core.js','text/javascript; charset=utf-8'],'/charts.js':['charts.js','text/javascript; charset=utf-8'],'/comparison.js':['comparison.js','text/javascript; charset=utf-8'],'/context-history.js':['context-history.js','text/javascript; charset=utf-8'],'/details.js':['details.js','text/javascript; charset=utf-8'],'/limit-history.js':['limit-history.js','text/javascript; charset=utf-8'],'/polling.js':['polling.js','text/javascript; charset=utf-8'],'/tasks.js':['tasks.js','text/javascript; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8'],'/details.css':['details.css','text/css; charset=utf-8'],'/app-icon.png':['app-icon.png','image/png'],'/favicon.png':['favicon.png','image/png'],'/favicon.svg':['favicon.svg','image/svg+xml']};
 staticFiles['/background.js']=['background.js','text/javascript; charset=utf-8'];

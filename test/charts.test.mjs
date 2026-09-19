@@ -87,6 +87,12 @@ test('gradients are namespaced so two charts on one page keep their colors',()=>
  assert.match(detail,/id="detail-series-codex"/);assert.ok(!detail.includes('chart-main'));
 });
 
+test('a hidden provider is absent from bars, gradients and tooltip rows',()=>{
+ const svg=seriesChart({rows,format,period:'day',idPrefix:'visible',tools:['claude']});
+ assert.ok(!svg.includes('visible-codex'));assert.ok(!svg.includes('chart-bar codex'));assert.ok(!svg.includes('Codex'));
+ assert.match(svg,/visible-claude/);assert.match(svg,/chart-bar claude/);assert.match(svg,/Claude Code/);
+});
+
 test('the scale gutter grows with the widest axis label',()=>{
  const short=seriesChart({rows,format:()=>'0',period:'day'}),long=seriesChart({rows,format:()=>'1.234.567,89 $',period:'day'});
  const gutter=svg=>Number(svg.match(/class="grid-line" x1="([\d.]+)"/)[1]);

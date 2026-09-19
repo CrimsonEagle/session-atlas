@@ -66,23 +66,26 @@ export function axisLabel(key,period){
 
 // rows: [{key,codex,claude}] with every period between first and last present, so the hover zones
 // tile the whole plot and an empty period reads as an explicit zero instead of a gap.
-export function seriesChart({rows,format,period='day',width=730,height=220,idPrefix='chart',title='',selectable=false,selectedKey=null}){
- const max=Math.max(1,...rows.map(row=>row.codex+row.claude));
+export function seriesChart({rows,format,period='day',width=730,height=220,idPrefix='chart',title='',selectable=false,selectedKey=null,tools=['codex','claude']}){
+ const visibleTools=tools.filter(tool=>tool==='codex'||tool==='claude'),names={codex:'Codex',claude:'Claude Code'};
+ const max=Math.max(1,...rows.map(row=>visibleTools.reduce((sum,tool)=>sum+(row[tool]||0),0)));
  const scale=[0,1,2,3].map(index=>format(max*(1-index/3)));
  // 84 is the tuned gutter of the overview chart; wider scale labels (money) push it out further.
  const left=Math.max(84,Math.min(124,Math.round(Math.max(...scale.map(label=>label.length))*6.2)+14));
  const top=17,plotW=width-14-left,plotH=height-65,step=plotW/Math.max(1,rows.length),bar=Math.min(28,step*.58);
  const every=Math.max(1,Math.ceil(rows.length/Math.max(4,Math.round(width/95))));
- let svg=`<defs><linearGradient id="${idPrefix}-codex" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7390f3"/><stop offset="1" stop-color="#4868d8"/></linearGradient><linearGradient id="${idPrefix}-claude" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e99b7f"/><stop offset="1" stop-color="#d97757"/></linearGradient></defs>`;
+ const gradients={codex:`<linearGradient id="${idPrefix}-codex" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7390f3"/><stop offset="1" stop-color="#4868d8"/></linearGradient>`,claude:`<linearGradient id="${idPrefix}-claude" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e99b7f"/><stop offset="1" stop-color="#d97757"/></linearGradient>`};
+ let svg=`<defs>${visibleTools.map(tool=>gradients[tool]).join('')}</defs>`;
  scale.forEach((label,index)=>{const y=top+plotH*index/3;svg+=`<line class="grid-line" x1="${left}" y1="${y}" x2="${width-14}" y2="${y}"/><text x="${left-9}" y="${y+4}" text-anchor="end">${esc(label)}</text>`;});
  svg+=`<line class="chart-axis" x1="${left}" y1="${top+plotH}" x2="${width-14}" y2="${top+plotH}"/>`;
  rows.forEach((row,index)=>{
-  const x=left+index*step+(step-bar)/2,total=row.codex+row.claude;
-  const codex=row.codex?Math.max(2,row.codex/max*plotH):0,claude=row.claude?Math.max(2,row.claude/max*plotH):0;
+  const x=left+index*step+(step-bar)/2,total=visibleTools.reduce((sum,tool)=>sum+(row[tool]||0),0);
+  const heights=Object.fromEntries(visibleTools.map(tool=>[tool,row[tool]?Math.max(2,row[tool]/max*plotH):0]));
   const selected=selectable&&row.key===selectedKey;
-  const payload={title:bucketLabel(row.key,period),rows:[['Codex',format(row.codex),'codex'],['Claude Code',format(row.claude),'claude']],total:['Gesamt',format(total)],note:selectable?(selected?'Ausgewählt · erneut anklicken, um den Filter aufzuheben':'Anklicken, um die Daten darunter zu filtern'):undefined};
+  const payload={title:bucketLabel(row.key,period),rows:visibleTools.map(tool=>[names[tool],format(row[tool]||0),tool]),total:['Gesamt',format(total)],note:selectable?(selected?'Ausgewählt · erneut anklicken, um den Filter aufzuheben':'Anklicken, um die Daten darunter zu filtern'):undefined};
   const interaction=selectable?` role="button" aria-pressed="${selected}" data-chart-bucket="${esc(row.key)}" data-chart-period="${esc(period)}"`:' role="img"';
-  svg+=`<g class="chart-column${selectable?' selectable':''}${selected?' selected':''}" tabindex="0"${interaction} aria-label="${esc(tipLabel(payload))}" ${tipAttr(payload)}><rect class="chart-hover-zone" x="${left+index*step}" y="${top}" width="${step+.35}" height="${plotH}" rx="4"/><rect class="chart-bar codex" fill="url(#${idPrefix}-codex)" x="${x}" y="${top+plotH-codex}" width="${bar}" height="${codex}" rx="3"/><rect class="chart-bar claude" fill="url(#${idPrefix}-claude)" x="${x}" y="${top+plotH-codex-claude}" width="${bar}" height="${claude}" rx="3"/></g>`;
+  let stacked=0;const bars=visibleTools.map(tool=>{stacked+=heights[tool];return `<rect class="chart-bar ${tool}" fill="url(#${idPrefix}-${tool})" x="${x}" y="${top+plotH-stacked}" width="${bar}" height="${heights[tool]}" rx="3"/>`;}).join('');
+  svg+=`<g class="chart-column${selectable?' selectable':''}${selected?' selected':''}" tabindex="0"${interaction} aria-label="${esc(tipLabel(payload))}" ${tipAttr(payload)}><rect class="chart-hover-zone" x="${left+index*step}" y="${top}" width="${step+.35}" height="${plotH}" rx="4"/>${bars}</g>`;
   if(index%every===0||(index===rows.length-1&&rows.length<8))svg+=`<text class="chart-x-label" x="${x+bar/2}" y="${top+plotH+25}" text-anchor="middle">${esc(axisLabel(row.key,period))}</text>`;
  });
  return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="${selectable?'group':'img'}" aria-label="${esc(title)}">${svg}</svg>`;

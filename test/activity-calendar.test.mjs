@@ -27,6 +27,12 @@ test('calendar markup distinguishes selection, unknown costs, zero and future da
  assert.match(html,/Kalenderjahr 2026/);assert.match(html,/1 ohne Preis/);
 });
 
+test('calendar tooltips only name visible providers',()=>{
+ const range={start:new Date(2026,8,14).getTime(),end:new Date(2026,8,14,23,59).getTime()},sessions=[{id:'one',tool:'claude',events:[event(new Date(2026,8,14,10),20,.02)]}];
+ const html=activityCalendarView({sessions,range,now:new Date(2026,8,14,12).getTime(),tools:['claude'],...helpers});
+ assert.match(html,/Claude Code/);assert.ok(!html.includes('Codex'));
+});
+
 test('calendar declines unbounded multi-year grids',()=>{
  const range={start:new Date(2025,0,1).getTime(),end:new Date(2026,11,31).getTime()};
  const html=activityCalendarView({sessions:[],range,years:[2026,2025],...helpers});
