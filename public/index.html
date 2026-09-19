@@ -24,6 +24,7 @@
     <label class="repo-filter"><span class="sr-only">Repository</span><select id="repository"><option value="all">Alle Repositories</option></select></label>
     <label class="model-filter"><span class="sr-only">Modell</span><select id="model"><option value="all">Alle Modelle</option></select></label>
     <label><span class="sr-only">Zeitraum</span><select id="period"><option value="today">Heute</option><option value="7">Letzte 7 Tage</option><option value="30" selected>Letzte 30 Tage</option><option value="12months">Letzte 12 Monate</option><option value="week">Diese Woche</option><option value="month">Dieser Monat</option><option value="all">Gesamter Verlauf</option><option value="custom">Eigener Zeitraum</option></select></label>
+    <button id="reset-filter-selection" class="button secondary filter-reset" type="button" disabled>Filter zurücksetzen</button>
     <div id="custom-dates" hidden><label>Von <input type="date" id="from"></label><label>Bis <input type="date" id="to"></label></div>
     <button id="compare-toggle" class="button secondary compare-toggle" type="button" aria-pressed="false">Zeiträume vergleichen</button>
     <div id="compare-controls" class="compare-controls" hidden>
