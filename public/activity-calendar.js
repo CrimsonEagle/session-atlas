@@ -25,10 +25,10 @@ export function calendarMetricValue(day,metric='tokens') {
  return day.tokens;
 }
 
-function monthName(date){return date.toLocaleDateString('de-DE',{month:'short'}).replace('.','');}
-function dayName(date){return date.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});}
+function monthName(date,locale){return date.toLocaleDateString(locale,{month:'short'}).replace('.','');}
+function dayName(date,locale){return date.toLocaleDateString(locale,{weekday:'long',day:'2-digit',month:'long',year:'numeric'});}
 
-export function activityCalendarView({sessions,range,metric='tokens',selectedKey=null,rangeMode='rolling',years=[],now=Date.now(),num,compact,money,tools=['codex','claude']}) {
+export function activityCalendarView({sessions,range,metric='tokens',selectedKey=null,rangeMode='rolling',years=[],now=Date.now(),num,compact,money,tools=['codex','claude'],locale='de-DE'}) {
  const visibleTools=tools.filter(tool=>tool==='codex'||tool==='claude'),toolNames={codex:'Codex',claude:'Claude Code'};
  const days=activityDays(sessions,range,now),metricLabel={tokens:'Tokens',cost:'API-Schätzung',requests:'Modellantworten'}[metric],format=value=>metric==='cost'?money(value):metric==='requests'?num(value):compact(value);
  const metricForTool=(tool,day)=>metric==='cost'?day.tools[tool].cost:metric==='requests'?day.tools[tool].requests:day.tools[tool].tokens;
@@ -41,11 +41,11 @@ export function activityCalendarView({sessions,range,metric='tokens',selectedKey
  const max=Math.max(0,...days.filter(day=>!day.future).map(day=>calendarMetricValue(day,metric))),level=day=>{const value=calendarMetricValue(day,metric);return value>0&&max>0?Math.max(1,Math.min(4,Math.ceil(value/max*4))):0;};
  const dayMap=new Map(days.map(day=>[day.key,day])),first=midnight(days[0].date),last=midnight(days.at(-1).date);first.setDate(first.getDate()-((first.getDay()+6)%7));last.setDate(last.getDate()+(7-last.getDay())%7);
  const weeks=[];let cursor=new Date(first),weekIndex=0;
- while(cursor<=last){const week=[];for(let row=0;row<7;row++){const key=calendarKey(cursor),day=dayMap.get(key);week.push(day||null);cursor=nextDay(cursor);}const monthDay=week.find(day=>day&&day.date.getDate()===1)||weekIndex===0&&week.find(Boolean);weeks.push({label:monthDay?monthName(monthDay.date):'',days:week});weekIndex++;}
+ while(cursor<=last){const week=[];for(let row=0;row<7;row++){const key=calendarKey(cursor),day=dayMap.get(key);week.push(day||null);cursor=nextDay(cursor);}const monthDay=week.find(day=>day&&day.date.getDate()===1)||weekIndex===0&&week.find(Boolean);weeks.push({label:monthDay?monthName(monthDay.date,locale):'',days:week});weekIndex++;}
  const button=day=>{
   if(!day)return '<span class="calendar-day outside" aria-hidden="true"></span>';
   const value=calendarMetricValue(day,metric),unknownCost=metric==='cost'&&day.unknown>0,selected=day.key===selectedKey;
-  const payload={title:dayName(day.date),rows:[[metricLabel,format(value)],['Sessions',num(day.sessionCount)],...visibleTools.map(tool=>[toolNames[tool],format(metricForTool(tool,day)),tool])],note:day.future?'Liegt in der Zukunft':day.unknown?`${num(day.unknown)} Antworten ohne bekannten Preis`:value?'Anklicken, um diesen Tag auszuwählen':'Keine Aktivität protokolliert'};
+  const payload={title:dayName(day.date,locale),rows:[[metricLabel,format(value)],['Sessions',num(day.sessionCount)],...visibleTools.map(tool=>[toolNames[tool],format(metricForTool(tool,day)),tool])],note:day.future?'Liegt in der Zukunft':day.unknown?`${num(day.unknown)} Antworten ohne bekannten Preis`:value?'Anklicken, um diesen Tag auszuwählen':'Keine Aktivität protokolliert'};
   return `<button type="button" class="calendar-day level-${level(day)}${unknownCost?' unknown-cost':''}${selected?' selected':''}${day.future?' future':''}" ${day.future?'disabled':`data-chart-bucket="${day.key}" data-chart-period="day" aria-pressed="${selected}"`} aria-label="${html(tipLabel(payload))}" ${tipAttr(payload)}><span>${day.date.getDate()}</span></button>`;
  };
  const total=totals(sessions.flatMap(session=>session.events)),active=days.filter(day=>!day.future&&day.requests).length,unknown=days.reduce((sum,day)=>sum+day.unknown,0);

@@ -107,6 +107,11 @@ test('labels and aria text describe the bucket in German',()=>{
  assert.match(tipAttr({title:'a"b'}),/^data-tip="{&quot;title&quot;:&quot;a\\&quot;b&quot;}"$/);
 });
 
+test('axis labels honor the selected English locale',()=>{
+ assert.equal(axisLabel('2026-09-10','day','en-US'),'Sep 10');
+ assert.equal(axisLabel('2026-09-10','month','en-US'),'Sep 26');
+});
+
 test('table rows sort numbers stably while missing values stay at the bottom',()=>{
  const values=[
   {name:'Zehn',value:10},

@@ -2,6 +2,9 @@
 
 Vendored for offline use, licensed under MIT (see PIXI-LICENSE.txt).
 
+The PixiJS bundle includes tiny-lru 11.4.7, licensed under BSD-3-Clause
+(see TINY-LRU-LICENSE.txt).
+
 - `pixi-8.21.0.mjs`: https://cdn.jsdelivr.net/npm/pixi.js@8.21.0/dist/pixi.min.mjs (unmodified).
 - `pixi-csp-8.21.0.mjs`: https://cdn.jsdelivr.net/npm/pixi.js@8.21.0/dist/packages/unsafe-eval.js
   with only its global wrapper adapted to ESM: `this.PIXI` becomes a namespace

@@ -53,20 +53,20 @@ export function attachTooltips(root){
  return ()=>hide(0);
 }
 
-export function bucketLabel(key,period){
+export function bucketLabel(key,period,locale='de-DE'){
  const date=new Date(key+'T00:00:00');
- if(period==='month')return date.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
- if(period==='week')return `Woche ab ${date.toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'})}`;
- return date.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+ if(period==='month')return date.toLocaleDateString(locale,{month:'long',year:'numeric'});
+ if(period==='week')return `${locale.startsWith('en')?'Week of':'Woche ab'} ${date.toLocaleDateString(locale,{day:'2-digit',month:'long',year:'numeric'})}`;
+ return date.toLocaleDateString(locale,{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
 }
-export function axisLabel(key,period){
+export function axisLabel(key,period,locale='de-DE'){
  const date=new Date(key+'T00:00:00');
- return period==='month'?date.toLocaleDateString('de-DE',{month:'short',year:'2-digit'}):date.toLocaleDateString('de-DE',{day:'2-digit',month:'short'});
+ return period==='month'?date.toLocaleDateString(locale,{month:'short',year:'2-digit'}):date.toLocaleDateString(locale,{day:'2-digit',month:'short'});
 }
 
 // rows: [{key,codex,claude}] with every period between first and last present, so the hover zones
 // tile the whole plot and an empty period reads as an explicit zero instead of a gap.
-export function seriesChart({rows,format,period='day',width=730,height=220,idPrefix='chart',title='',selectable=false,selectedKey=null,tools=['codex','claude']}){
+export function seriesChart({rows,format,period='day',width=730,height=220,idPrefix='chart',title='',selectable=false,selectedKey=null,tools=['codex','claude'],locale='de-DE'}){
  const visibleTools=tools.filter(tool=>tool==='codex'||tool==='claude'),names={codex:'Codex',claude:'Claude Code'};
  const max=Math.max(1,...rows.map(row=>visibleTools.reduce((sum,tool)=>sum+(row[tool]||0),0)));
  const scale=[0,1,2,3].map(index=>format(max*(1-index/3)));
@@ -82,17 +82,17 @@ export function seriesChart({rows,format,period='day',width=730,height=220,idPre
   const x=left+index*step+(step-bar)/2,total=visibleTools.reduce((sum,tool)=>sum+(row[tool]||0),0);
   const heights=Object.fromEntries(visibleTools.map(tool=>[tool,row[tool]?Math.max(2,row[tool]/max*plotH):0]));
   const selected=selectable&&row.key===selectedKey;
-  const payload={title:bucketLabel(row.key,period),rows:visibleTools.map(tool=>[names[tool],format(row[tool]||0),tool]),total:['Gesamt',format(total)],note:selectable?(selected?'Ausgewählt · erneut anklicken, um den Filter aufzuheben':'Anklicken, um die Daten darunter zu filtern'):undefined};
+  const payload={title:bucketLabel(row.key,period,locale),rows:visibleTools.map(tool=>[names[tool],format(row[tool]||0),tool]),total:['Gesamt',format(total)],note:selectable?(selected?'Ausgewählt · erneut anklicken, um den Filter aufzuheben':'Anklicken, um die Daten darunter zu filtern'):undefined};
   const interaction=selectable?` role="button" aria-pressed="${selected}" data-chart-bucket="${esc(row.key)}" data-chart-period="${esc(period)}"`:' role="img"';
   let stacked=0;const bars=visibleTools.map(tool=>{stacked+=heights[tool];return `<rect class="chart-bar ${tool}" fill="url(#${idPrefix}-${tool})" x="${x}" y="${top+plotH-stacked}" width="${bar}" height="${heights[tool]}" rx="3"/>`;}).join('');
   svg+=`<g class="chart-column${selectable?' selectable':''}${selected?' selected':''}" tabindex="0"${interaction} aria-label="${esc(tipLabel(payload))}" ${tipAttr(payload)}><rect class="chart-hover-zone" x="${left+index*step}" y="${top}" width="${step+.35}" height="${plotH}" rx="4"/>${bars}</g>`;
-  if(index%every===0||(index===rows.length-1&&rows.length<8))svg+=`<text class="chart-x-label" x="${x+bar/2}" y="${top+plotH+25}" text-anchor="middle">${esc(axisLabel(row.key,period))}</text>`;
+  if(index%every===0||(index===rows.length-1&&rows.length<8))svg+=`<text class="chart-x-label" x="${x+bar/2}" y="${top+plotH+25}" text-anchor="middle">${esc(axisLabel(row.key,period,locale))}</text>`;
  });
  return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="${selectable?'group':'img'}" aria-label="${esc(title)}">${svg}</svg>`;
 }
 
-const tableCollator=new Intl.Collator('de-DE',{numeric:true,sensitivity:'base'});
-export function compareValues(left,right){const leftMissing=left===null||left===undefined||Number.isNaN(left),rightMissing=right===null||right===undefined||Number.isNaN(right);if(leftMissing||rightMissing)return leftMissing===rightMissing?0:leftMissing?1:-1;if(typeof left==='number'&&typeof right==='number')return left-right;return tableCollator.compare(String(left),String(right));}
+const collator=()=>new Intl.Collator(globalThis.document?.documentElement?.lang==='en'?'en-US':'de-DE',{numeric:true,sensitivity:'base'});
+export function compareValues(left,right){const leftMissing=left===null||left===undefined||Number.isNaN(left),rightMissing=right===null||right===undefined||Number.isNaN(right);if(leftMissing||rightMissing)return leftMissing===rightMissing?0:leftMissing?1:-1;if(typeof left==='number'&&typeof right==='number')return left-right;return collator().compare(String(left),String(right));}
 export function sortRows(rows,key,direction,valueFor){const factor=direction==='asc'?1:-1;return rows.map((row,index)=>({row,index,value:valueFor(row,key)})).sort((left,right)=>{const leftMissing=left.value===null||left.value===undefined||Number.isNaN(left.value),rightMissing=right.value===null||right.value===undefined||Number.isNaN(right.value);if(leftMissing||rightMissing)return leftMissing===rightMissing?left.index-right.index:leftMissing?1:-1;const result=compareValues(left.value,right.value);return result?result*factor:left.index-right.index;}).map(item=>item.row);}
 export function nextSort(activeKey,direction,key,defaultDirection='asc'){return activeKey===key?{key,direction:direction==='asc'?'desc':'asc'}:{key,direction:defaultDirection};}
 export function sortableHeader(label,key,{activeKey,direction='asc',context,numeric=false,defaultDirection=numeric?'desc':'asc'}={}){const active=activeKey===key,ariaSort=active?(direction==='asc'?'ascending':'descending'):'none',mark=active?(direction==='asc'?'↑':'↓'):'↕',ariaLabel=`${label} sortieren${active?`, aktuell ${direction==='asc'?'aufsteigend':'absteigend'}`:''}`;return `<th class="sortable${numeric?' numeric':''}${active?' sorted':''}" aria-sort="${ariaSort}"><button type="button" class="table-sort" data-sort-context="${context}" data-sort-key="${key}" data-sort-default="${defaultDirection}" aria-label="${ariaLabel}"><span>${label}</span><span class="sort-mark" aria-hidden="true">${mark}</span></button></th>`;}

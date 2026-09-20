@@ -42,6 +42,7 @@ const staticFiles={'/':['index.html','text/html; charset=utf-8'],'/app.js':['app
 staticFiles['/background.js']=['background.js','text/javascript; charset=utf-8'];
 staticFiles['/background.css']=['background.css','text/css; charset=utf-8'];
 staticFiles['/pixi-background.js']=['pixi-background.js','text/javascript; charset=utf-8'];
+staticFiles['/i18n.js']=['i18n.js','text/javascript; charset=utf-8'];
 staticFiles['/vendor/pixi-8.21.0.mjs']=['vendor/pixi-8.21.0.mjs','text/javascript; charset=utf-8'];
 staticFiles['/vendor/pixi-csp-8.21.0.mjs']=['vendor/pixi-csp-8.21.0.mjs','text/javascript; charset=utf-8'];
 let mutating=false;
