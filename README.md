@@ -48,12 +48,12 @@ These folders are read by default:
 
 | Tool | Data source |
 | --- | --- |
-| Claude Code | `%USERPROFILE%\.claude\projects`, including `subagents`; limits additionally come from `%USERPROFILE%\.claude.json` and, when configured, `%USERPROFILE%\.claude\session-atlas-limits.json` |
+| Claude Code | `%USERPROFILE%\.claude\projects`, including `subagents`; limits additionally come from `%USERPROFILE%\.claude.json`, `%USERPROFILE%\.claude\session-atlas-limits.json`, and the bridge inbox `%USERPROFILE%\.claude\session-atlas-limit-inbox` |
 | Codex | `%USERPROFILE%\.codex\sessions` and `archived_sessions` |
 
 `CLAUDE_CONFIG_DIR` and `CODEX_HOME` override the respective root directory on first launch. Additional absolute source folders can be added in the settings, including accessible UNC or WSL directories. Data on other computers or in the browser is not collected automatically.
 
-The files are **read-only**. Credentials are never accessed. Prompts and responses are discarded during parsing. From `.claude.json`, only the plan, measurement time, and two limit windows are read; the account identifier, project list, and prompt history in the same file remain unread and are **not** cached. The optional status-line bridge is the only component that writes to Claude configuration at all: Claude Code invokes it when rendering the status line, it writes only the limit block to `session-atlas-limits.json`, and it discards the model, working directory, branch, and every other input field. The server itself never writes to source folders. The local cache contains usage events, context samples, session IDs, metadata such as working directory, branch, and session title, and the most recently reported Codex limits.
+Session logs and configuration files are **read-only**. Credentials are never accessed. Prompts and responses are discarded during parsing. From `.claude.json`, only the plan, measurement time, and two limit windows are retained; the account identifier, project list, and prompt history are **not** cached. Claude Code invokes the optional status-line bridge when rendering the status line. It writes only the limit block to `session-atlas-limits.json` and, when a value changes, an immutable entry in `session-atlas-limit-inbox`; model, working directory, branch, session ID, and every other input field are discarded. After the server has committed these entries to its local cache, it removes exactly the imported inbox files. It never modifies session logs or Claude configuration. The local cache contains usage events, context samples, session IDs, metadata such as working directory, branch, and session title, and the limit history.
 
 App data is stored in a versioned set under `.local/states/<id>/`; `.local/active-state.json` points atomically to the active set. It includes `usage-cache.json`, `settings.json`, `model-prices.json`, and `price-history.json`. Existing flat files are copied into an initial set on first launch. The server binds exclusively to `127.0.0.1`; foreign origins and changes without a local session token are rejected.
 
@@ -63,7 +63,7 @@ Git repositories are detected from their `.git` metadata, and worktrees are asso
 
 ### Keeping Claude Limits Current (Optional)
 
-Claude Code writes `cachedUsageUtilization` only when it retrieves the values itself, not after every response. A measurement may therefore be several days old. The included bridge hooks into the documented status-line interface and stores a fresh value on every render. Add the following to the **Claude Code** `settings.json`:
+Claude Code writes `cachedUsageUtilization` only when it retrieves the values itself, not after every response. A measurement may therefore be several days old. The included bridge hooks into the documented status-line interface, refreshes the current snapshot on every render, and queues every changed measurement until Session Atlas has durably imported it. Session Atlas therefore does not need to be running while Claude Code is active. Add the following to the **Claude Code** `settings.json`:
 
 ```json
 "statusLine": { "command": "node \"C:\\Path\\to\\Session-Atlas\\bridge\\atlas-statusline.mjs\"" }
@@ -75,7 +75,7 @@ If you already use a status line, place the existing command after the bridge. T
 node "C:\Path\to\Session-Atlas\bridge\atlas-statusline.mjs" -- bash my-script.sh
 ```
 
-With `--quiet`, it only writes the file and produces no output. `ATLAS_RATE_LIMIT_FILE` changes the destination file. Each status-line render starts a short-lived Node process; the Claude Code setting `statusLine.refreshInterval` controls how often this happens. Errors are harmless: with invalid input, missing limit fields, or a follow-up command that cannot be started, the bridge writes nothing and exits with code 0 so the status line does not break. The app shows the expected path and current status under **Settings → Keep Claude Limits Current**.
+With `--quiet`, it only writes the files and produces no output. `ATLAS_RATE_LIMIT_FILE` changes the snapshot destination; `ATLAS_RATE_LIMIT_INBOX` can override the sibling inbox directory. Unchanged percentages refresh the snapshot timestamp without creating redundant inbox entries. Each status-line render starts a short-lived Node process; the Claude Code setting `statusLine.refreshInterval` controls how often this happens. Errors are harmless: with invalid input, missing limit fields, or a follow-up command that cannot be started, the bridge writes nothing and exits with code 0 so the status line does not break. The app shows the expected path and current status under **Settings → Keep Claude Limits Current**.
 
 ## Counting and Known Limitations
 

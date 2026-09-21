@@ -3,7 +3,7 @@ import {attachTooltips,axisLabel,nextSort,seriesChart,sortableHeader,sortRows,ti
 import {contextHistoryView} from './context-history.js';
 
 export function createDetailViews(options) {
- const {dialog,content,getData,getFiltered,getScope,applyFilter,loadSessionDetails,esc,num,compact,money,date,basename,toolName,toolTag,costText}=options,activeLocale=()=>typeof options.locale==='function'?options.locale():options.locale||'de-DE';
+ const {dialog,content,getData,getFiltered,getScope,applyFilter,loadSessionDetails,esc,num,compact,money,date,basename,toolName,toolTag,costText}=options,activeLocale=()=>typeof options.locale==='function'?options.locale():options.locale||'de-DE',activeTools=()=>typeof options.getActiveTools==='function'?options.getActiveTools():['codex','claude'];
  const pageSize=12,responsePageSize=20;
  let state={view:null},history=[],searchTimer;
 
@@ -43,12 +43,13 @@ export function createDetailViews(options) {
  function chartSize(){const width=Math.round(Math.max(300,Math.min(1240,innerWidth-32)-48));return {width,height:Math.round(Math.min(290,Math.max(190,width*.26)))};}
  function timeline(sessions,metric){
   const {period,rows}=bucketSeries(sessions,metric),{width,height}=chartSize();
+  const tools=activeTools();
   const periodName={day:'Tag',week:'Woche',month:'Monat'}[period],metricName={tokens:'Tokens',cost:'Kosten',requests:'Modellantworten'}[metric];
   const range=rows.length?`${periodName} · ${num(rows.length)} ${rows.length===1?'Abschnitt':'Abschnitte'} · ${axisLabel(rows[0].key,period,activeLocale())} – ${axisLabel(rows.at(-1).key,period,activeLocale())}`:'Keine Nutzungsereignisse im Ausschnitt';
   const head=`<div class="detail-section-head"><div><h3>Verlauf</h3><p>${esc(range)}</p></div><div class="segments" aria-label="Verlaufsmetrik">${[['tokens','Tokens'],['cost','Kosten'],['requests','Antworten']].map(([key,label])=>`<button data-detail-metric="${key}" class="${metric===key?'active':''}">${label}</button>`).join('')}</div></div>`;
   if(!rows.length)return `<section class="detail-section detail-timeline">${head}<div class="detail-empty">Keine Nutzungsereignisse für den Verlauf.</div></section>`;
-  const chart=seriesChart({rows,format:value=>metricValue(metric,value),period,width,height,idPrefix:'detail-series',title:`${metricName} je ${periodName}`,locale:activeLocale()});
-  return `<section class="detail-section detail-timeline">${head}<div class="detail-chart-wrap" data-tip-host>${chart}</div><div class="detail-chart-legend"><span><i class="dot codex"></i>Codex</span><span><i class="dot claude"></i>Claude Code</span></div></section>`;
+  const chart=seriesChart({rows,format:value=>metricValue(metric,value),period,width,height,idPrefix:'detail-series',title:`${metricName} je ${periodName}`,tools,locale:activeLocale()});
+  return `<section class="detail-section detail-timeline">${head}<div class="detail-chart-wrap" data-tip-host>${chart}</div><div class="detail-chart-legend">${tools.map(tool=>`<span><i class="dot ${tool}"></i>${esc(toolName(tool))}</span>`).join('')}</div></section>`;
  }
  function dimensionKinds(kind,sessions){
   const map={repository:['model','tool','branch'],model:['repository','tool','tier'],tool:['model','repository','branch'],branch:['model','tool','agent'],agent:['repository','model','tool']};

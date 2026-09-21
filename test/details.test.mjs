@@ -13,8 +13,9 @@ test('table-scoped data drives session and aggregate details while the full sess
  const selected=chartScopedSessions([raw],'overview','2026-09-10','day'),listeners={};
  const dialog={open:false,classList:{add(){},remove(){}},addEventListener(type,handler){listeners[type]=handler;},showModal(){this.open=true;},close(){this.open=false;}};
  const content={innerHTML:'',contains:()=>false,querySelector:()=>null};
- const views=createDetailViews({dialog,content,getData:()=>({sessions:[raw]}),getFiltered:()=>selected,getScope:()=>({period:'all',selectedChartLabel:'Ausgewählter Tag',bounds:{start:0,end:Date.now()},tool:'all',repository:'all',query:''}),applyFilter:()=>{},esc:String,num:String,compact:String,money:String,date:String,basename:String,toolName:String,toolTag:String,costText:value=>String(value.cost)});
+ const views=createDetailViews({dialog,content,getData:()=>({sessions:[raw]}),getFiltered:()=>selected,getActiveTools:()=>['codex'],getScope:()=>({period:'all',selectedChartLabel:'Ausgewählter Tag',bounds:{start:0,end:Date.now()},tool:'all',repository:'all',query:''}),applyFilter:()=>{},esc:String,num:String,compact:String,money:String,date:String,basename:String,toolName:tool=>tool==='codex'?'Codex':'Claude Code',toolTag:String,costText:value=>String(value.cost)});
  views.aggregate('repository','repo');assert.match(content.innerHTML,/<span>Tokens<\/span><strong>100<\/strong>/);assert.match(content.innerHTML,/Ausgewählter Tag/);
+ assert.match(content.innerHTML,/data-tip="[^"]*Codex/);assert.doesNotMatch(content.innerHTML,/Claude Code/);
  views.session('one');assert.match(content.innerHTML,/<span>Tokens<\/span><strong>100<\/strong>/);assert.match(content.innerHTML,/Ausgewählter Tag/);
  const scopeTarget={closest:selector=>selector==='[data-detail-scope]'?{dataset:{detailScope:'all'}}:null};listeners.click({target:scopeTarget});
  assert.match(content.innerHTML,/<span>Tokens<\/span><strong>300<\/strong>/);assert.match(content.innerHTML,/Gesamte Session/);

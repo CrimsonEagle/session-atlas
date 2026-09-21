@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {bridgeCandidates,configCandidates,normalize,normalizeBridge,planLabel,readLimits} from '../lib/claude-limits.mjs';
+import {BRIDGE_FILE,INBOX_DIR,bridgeCandidates,configCandidates,inboxCandidates,normalize,normalizeBridge,planLabel,readLimitInbox,readLimits} from '../lib/claude-limits.mjs';
 import {Store} from '../lib/store.mjs';
 async function fixture(t){const dir=await fs.mkdtemp(path.join(os.tmpdir(),'session-atlas-test-'));t.after(async()=>{if(path.dirname(dir)!==os.tmpdir()||!path.basename(dir).startsWith('session-atlas-test-'))throw Error('Unexpected cleanup path');await fs.rm(dir,{recursive:true,force:true});});return dir;}
 const config=(fetchedAtMs,utilization)=>({
@@ -69,6 +69,7 @@ test('Both config layouts are probed and the newest measurement wins',async t=>{
  const roots=[path.join(nested,'projects')];
  assert.deepEqual(configCandidates(roots),[path.join(nested,'.claude.json'),path.join(dir,'.claude.json')]);
  assert.deepEqual(bridgeCandidates(roots),[path.join(nested,'session-atlas-limits.json'),path.join(dir,'session-atlas-limits.json')]);
+ assert.deepEqual(inboxCandidates(roots),[path.join(nested,INBOX_DIR),path.join(dir,INBOX_DIR)]);
  const warnings=[];
  assert.equal(await readLimits(roots,warnings),null);
  assert.deepEqual(warnings,[]);
@@ -108,11 +109,26 @@ test('The bridge stores only the rate limit block and never fails loudly',async 
  assert.deepEqual(Object.keys(state).sort(),['observedAtMs','rate_limits','version']);
  assert.ok(!JSON.stringify(state).includes('PRIVATE'),'no payload field beyond rate_limits is stored');
  assert.equal(normalizeBridge(state).primary.used_percent,42);
+ const inbox=path.join(dir,INBOX_DIR),events=(await fs.readdir(inbox)).filter(name=>name.endsWith('.json'));
+ assert.equal(events.length,1);
+ const queued=JSON.parse(await fs.readFile(path.join(inbox,events[0]),'utf8'));
+ assert.deepEqual(Object.keys(queued).sort(),['id','observedAtMs','rate_limits','version']);
+ assert.ok(!JSON.stringify(queued).includes('PRIVATE'),'queued measurements retain no unrelated status-line fields');
  // Unparsable input and payloads without limits leave both the status line and the file intact.
  const other=path.join(dir,'other.json');
  assert.equal((await runBridge([],'not json at all',{ATLAS_RATE_LIMIT_FILE:other})).code,0);
  assert.equal((await runBridge([],JSON.stringify({model:{display_name:'Opus 5'}}),{ATLAS_RATE_LIMIT_FILE:other})).code,0);
  assert.equal(await fs.access(other).then(()=>true,()=>false),false);
+});
+test('The bridge queues changed measurements without accumulating unchanged renders',async t=>{
+ const dir=await fixture(t),file=path.join(dir,BRIDGE_FILE),inbox=path.join(dir,INBOX_DIR),payload=JSON.stringify({rate_limits:statusline});
+ await runBridge(['--quiet'],payload,{ATLAS_RATE_LIMIT_FILE:file});
+ await runBridge(['--quiet'],payload,{ATLAS_RATE_LIMIT_FILE:file});
+ assert.equal((await fs.readdir(inbox)).filter(name=>name.endsWith('.json')).length,1);
+ const changed={...statusline,five_hour:{...statusline.five_hour,used_percentage:43}};
+ await runBridge(['--quiet'],JSON.stringify({rate_limits:changed}),{ATLAS_RATE_LIMIT_FILE:file});
+ const queued=await readLimitInbox([path.join(dir,'projects')]);
+ assert.deepEqual(queued.map(entry=>entry.limit.primary.used_percent).sort((a,b)=>a-b),[42,43]);
 });
 test('Quiet mode prints nothing and a wrapped command still renders the line',async t=>{
  const dir=await fixture(t),file=path.join(dir,'session-atlas-limits.json');
@@ -154,4 +170,23 @@ test('Claude limits reach the snapshot without caching the configuration',async 
  assert.equal(restored.snapshot(settings).limits.claude,undefined);
  // Dropping the Claude source removes the limit as well.
  assert.equal((await store.scan({...settings,claudeRoots:[]})).limits.claude,undefined);
+});
+test('Queued limit measurements are committed before their inbox files are removed',async t=>{
+ const dir=await fixture(t),logs=path.join(dir,'projects'),inbox=path.join(dir,INBOX_DIR),cacheFile=path.join(dir,'cache.json');
+ await fs.mkdir(logs);await fs.mkdir(inbox);
+ const first=bridgeState(Date.parse('2026-09-13T10:00:00Z')),
+  second=bridgeState(Date.parse('2026-09-13T10:05:00Z'),{...statusline,five_hour:{...statusline.five_hour,used_percentage:47}});
+ await fs.writeFile(path.join(inbox,'one.json'),JSON.stringify({...first,id:'one'}));
+ await fs.writeFile(path.join(inbox,'two.json'),JSON.stringify({...second,id:'two'}));
+ const settings={claudeRoots:[logs],codexRoots:[],prices:{},limitRetentionDays:90},store=new Store(cacheFile),persist=store.persist.bind(store);
+ store.persist=async()=>{const error=Error('simulated');error.code='EIO';throw error;};
+ const failed=await store.scan(settings);
+ assert.equal(failed.limitHistory.filter(point=>point.tool==='claude').length,3,'the unchanged weekly value is deduplicated');
+ assert.equal((await fs.readdir(inbox)).filter(name=>name.endsWith('.json')).length,2,'failed persistence keeps the inbox intact');
+ assert.ok(failed.stats.warnings.some(warning=>warning.includes('EIO')));
+ store.persist=persist;
+ await store.scan(settings);
+ assert.deepEqual((await fs.readdir(inbox)).filter(name=>name.endsWith('.json')),[],'a successful retry acknowledges the imported files');
+ const saved=JSON.parse(await fs.readFile(cacheFile,'utf8'));
+ assert.equal(saved.limitHistory.filter(point=>point.tool==='claude').length,3);
 });
