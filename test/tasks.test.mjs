@@ -29,6 +29,11 @@ test('forks remain independent tasks and markup offers session navigation',()=>{
  assert.match(html,/<strong>2<\/strong><small>Sessions<\/small>/);assert.match(html,/data-session="codex:child"/);assert.match(html,/Eigen/);assert.match(html,/Mit Kindern/);assert.equal(taskRows([fork,child]).roots.length,1);
 });
 
+test('expanded tasks stay open when their markup is rendered again',()=>{
+ const root=session('root'),closed=taskView({sessions:[root]}),open=taskView({sessions:[root],expandedTasks:new Set([root.id])});
+ assert.match(closed,/data-task-id="codex:root" >/);assert.match(open,/data-task-id="codex:root" open>/);
+});
+
 test('a session resolves to its complete task tree at arbitrary nesting depth',()=>{
  const root=session('root'),child=session('child',{parentId:'root',relationType:'subagent'}),grandchild=session('grandchild',{parentId:'child',relationType:'subagent'}),greatGrandchild=session('great-grandchild',{parentId:'grandchild',relationType:'subagent'});
  const tree=taskTreeForSession(grandchild,[root,child,grandchild,greatGrandchild]);
