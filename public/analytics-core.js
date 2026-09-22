@@ -62,7 +62,7 @@ export function filterSessions(sessions=[],scope={},range=scope.bounds) {
  return sessions.flatMap(session=>{
   if(tool!=='all'&&session.tool!==tool)return [];
   if(repository!=='all'&&session.repository!==repository)return [];
-  const haystack=[session.title,session.cwd,session.repository,session.branch||'Ohne Branch',session.sessionId,session.subagent?'Subagent':'Hauptsession',...new Set((session.events||[]).map(event=>event.model))].join(' ').toLowerCase();
+  const haystack=[session.name,session.title,session.cwd,session.repository,session.branch||'Ohne Branch',session.sessionId,session.subagent?'Subagent':'Hauptsession',...new Set((session.events||[]).map(event=>event.model))].join(' ').toLowerCase();
   if(query&&!haystack.includes(query))return [];
   const events=(session.events||[]).filter(event=>{const time=validTime(event.time);return time!==null&&time>=start&&time<=end&&(model==='all'||event.model===model);});
   if(events.length)return [{...session,events,...eventRange(events,session)}];

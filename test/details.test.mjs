@@ -20,3 +20,20 @@ test('table-scoped data drives session and aggregate details while the full sess
  const scopeTarget={closest:selector=>selector==='[data-detail-scope]'?{dataset:{detailScope:'all'}}:null};listeners.click({target:scopeTarget});
  assert.match(content.innerHTML,/<span>Tokens<\/span><strong>300<\/strong>/);assert.match(content.innerHTML,/Gesamte Session/);
 });
+
+test('session details show and navigate the complete nested agent tree',t=>{
+ const descriptors={innerWidth:Object.getOwnPropertyDescriptor(globalThis,'innerWidth'),addEventListener:Object.getOwnPropertyDescriptor(globalThis,'addEventListener')};
+ Object.defineProperty(globalThis,'innerWidth',{value:1000,configurable:true});Object.defineProperty(globalThis,'addEventListener',{value:()=>{},configurable:true});
+ t.after(()=>{for(const [key,descriptor] of Object.entries(descriptors))if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];});
+ const make=(sessionId,parentId='')=>({id:`codex:${sessionId}`,sessionId,tool:'codex',repository:'repo',cwd:'repo',branch:'main',subagent:Boolean(parentId),relationType:parentId?'subagent':'',parentId,title:sessionId,started:'2026-09-10T10:00:00Z',lastActivity:'2026-09-10T10:00:00Z',events:[event('2026-09-10T10:00:00Z',10)]});
+ const sessions=[make('root'),make('child','root'),make('grandchild','child')],listeners={};
+ const dialog={open:false,classList:{add(){},remove(){}},addEventListener(type,handler){listeners[type]=handler;},showModal(){this.open=true;},close(){this.open=false;}};
+ const content={innerHTML:'',contains:()=>false,querySelector:()=>null};
+ const views=createDetailViews({dialog,content,getData:()=>({sessions}),getFiltered:()=>sessions,getActiveTools:()=>['codex'],getScope:()=>({period:'all',bounds:{start:0,end:Date.now()},tool:'all',repository:'all',query:''}),applyFilter:()=>{},esc:String,num:String,compact:String,money:String,date:String,basename:String,toolName:String,toolTag:String,costText:value=>String(value.cost)});
+ views.session('codex:child');
+ assert.match(content.innerHTML,/Session-Hierarchie/);
+ assert.match(content.innerHTML,/aria-level="3"/);
+ assert.match(content.innerHTML,/data-session="codex:root"/);
+ assert.match(content.innerHTML,/data-session="codex:grandchild"/);
+ assert.match(content.innerHTML,/aria-current="true"/);
+});

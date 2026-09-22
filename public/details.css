@@ -316,6 +316,21 @@ dialog:not(.detail-wide) .detail-body>.metrics .metric:nth-child(3) .metric-valu
 .limit-history-legend .window-300{border-color:var(--detail-indigo)!important;background:color-mix(in srgb,var(--detail-indigo) 16%,transparent)!important}
 .limit-history-legend .window-10080{border-color:var(--detail-violet)!important;background:color-mix(in srgb,var(--detail-violet) 16%,transparent)!important}
 
+.detail-agent-nodes{padding:10px 18px 14px;background:var(--surface-soft)}
+.detail-agent-node{position:relative;margin-left:calc(var(--task-depth) * 25px);border-bottom:1px solid var(--line-soft)}
+.detail-agent-node:last-child{border-bottom:0}
+.detail-agent-node>.task-connector{position:absolute;left:-15px;top:0;width:11px;height:28px;border-left:1px solid var(--line);border-bottom:1px solid var(--line)}
+.detail-agent-node[aria-level="1"]>.task-connector{display:none}
+.detail-agent-link{display:flex;align-items:center;justify-content:space-between;gap:18px;width:100%;min-height:55px;padding:9px 10px;border:0;border-radius:8px;background:transparent;color:var(--ink);text-align:left}
+button.detail-agent-link:hover{background:var(--detail-indigo-soft)}
+.detail-agent-link>span:first-child{min-width:0}
+.detail-agent-link strong,.detail-agent-link small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.detail-agent-link small{margin-top:4px;color:var(--muted);font-size:9px}
+.detail-agent-node.current>.detail-agent-link{box-shadow:inset 3px 0 var(--detail-indigo);background:color-mix(in srgb,var(--detail-indigo-soft) 70%,var(--surface))}
+.detail-agent-metrics{display:grid;grid-template-columns:86px 108px 72px;align-items:center;gap:10px;flex-shrink:0;text-align:right}
+.detail-agent-metrics>span{min-width:0}
+.detail-agent-metrics strong{font-size:11px}
+
 @keyframes detail-enter{from{opacity:0;transform:translateY(9px) scale(.985)}to{opacity:1;transform:none}}
 @media(max-width:900px){
  .detail-kpis{gap:8px}
@@ -328,6 +343,9 @@ dialog:not(.detail-wide) .detail-body>.metrics .metric:nth-child(3) .metric-valu
  .detail-insights span{border:1px solid var(--line-soft)}
  .detail-token-block{padding:15px}
  .detail-meta>div{padding:12px}
+ .detail-agent-node{margin-left:calc(var(--task-depth) * 14px)}
+ .detail-agent-metrics{grid-template-columns:1fr}
+ .detail-agent-metrics>span:last-child{display:none}
  dialog:not(.detail-wide) .detail-body>.metrics{grid-template-columns:1fr}
  dialog:not(.detail-wide) .detail-body>.metrics .metric{border:1px solid var(--line-soft)}
 }

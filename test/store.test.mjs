@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {DatabaseSync} from 'node:sqlite';
 import {Store} from '../lib/store.mjs';
 async function fixture(t){const dir=await fs.mkdtemp(path.join(os.tmpdir(),'session-atlas-test-'));t.after(async()=>{if(path.dirname(dir)!==os.tmpdir()||!path.basename(dir).startsWith('session-atlas-test-'))throw Error('Unexpected cleanup path');await fs.rm(dir,{recursive:true,force:true});});const logs=path.join(dir,'logs');await fs.mkdir(logs);return {dir,logs,settings:{claudeRoots:[logs],codexRoots:[],prices:{}}};}
 const line=(id,output=10)=>JSON.stringify({type:'assistant',timestamp:'2026-09-11T10:00:00Z',sessionId:'session',cwd:'C:/example',message:{id,model:'claude-sonnet-4-6',usage:{input_tokens:100,output_tokens:output},content:[{type:'text',text:'PRIVATE CONTENT SHOULD NEVER BE CACHED'}]}})+'\n';
@@ -11,6 +12,14 @@ const codexLine=value=>JSON.stringify(value)+'\n';
 const codexMeta=(id='thread')=>codexLine({type:'session_meta',timestamp:'2026-09-11T10:00:00Z',payload:{id,timestamp:'2026-09-11T10:00:00Z',cwd:'C:/example'}});
 const codexCumulative=(input=100)=>codexLine({type:'event_msg',timestamp:'2026-09-11T10:01:00Z',payload:{type:'token_count',info:{last_token_usage:{input_tokens:input,output_tokens:10},total_token_usage:{input_tokens:input,output_tokens:10}}}});
 const codexRecord=(id='thread',response='response',input=100)=>codexLine({type:'token_usage_record',timestamp:'2026-09-11T10:01:00Z',payload:{thread_id:id,response_id:response,usage:{input_tokens:input,output_tokens:10}}});
+test('Codex state names are merged into snapshots and persisted',async t=>{
+ const home=await fs.mkdtemp(path.join(os.tmpdir(),'session-atlas-codex-name-')),logs=path.join(home,'sessions'),cache=path.join(home,'cache.json');
+ t.after(async()=>fs.rm(home,{recursive:true,force:true}));await fs.mkdir(logs);await fs.writeFile(path.join(logs,'thread.jsonl'),codexMeta('thread')+codexCumulative());
+ const db=new DatabaseSync(path.join(home,'state_5.sqlite'));db.exec('CREATE TABLE threads (id TEXT PRIMARY KEY, name TEXT, title TEXT NOT NULL)');db.prepare('INSERT INTO threads (id, name, title) VALUES (?, ?, ?)').run('thread','Important task','Generated fallback');db.close();
+ const settings={claudeRoots:[],codexRoots:[logs],prices:{}},store=new Store(cache),snapshot=await store.scan(settings);
+ assert.equal(snapshot.sessions[0].name,'Important task');assert.equal(snapshot.sessions[0].title,'Important task');assert.equal(snapshot.sessions[0].nameSource,'codex.state.threads.name');
+ const restored=new Store(cache);await restored.load();assert.equal(restored.snapshot(settings).sessions[0].name,'Important task');
+});
 test('Incremental scan handles split UTF-8 lines, cache reload and historical retention',async t=>{
  const {dir,logs,settings}=await fixture(t);const file=path.join(logs,'session.jsonl'),cache=path.join(dir,'cache.json');const s=new Store(cache);
  await fs.writeFile(file,line('one')+line('twö').slice(0,60));let x=await s.scan(settings);assert.equal(x.sessions[0].events.length,1);const firstRevision=x.detailRevision;
@@ -77,6 +86,16 @@ test('Conflicting explicit relationships stay visible instead of choosing a pare
  await fs.writeFile(path.join(active,'child.jsonl'),meta('parent-a'));await fs.writeFile(path.join(archive,'child.jsonl'),meta('parent-b'));
  const settings={claudeRoots:[],codexRoots:[logs],prices:{}},result=await new Store(path.join(dir,'cache.json')).scan(settings);
  assert.equal(result.sessions[0].parentId,'');assert.equal(result.sessions[0].relationType,'ambiguous');assert.match(result.sessions[0].relationEvidence,/conflicting/);
+});
+test('Claude agent metadata builds a recursive main, child and grandchild tree',async t=>{
+ const {dir,logs,settings}=await fixture(t),project=path.join(logs,'project'),rootDir=path.join(project,'root-session'),agents=path.join(rootDir,'subagents');await fs.mkdir(agents,{recursive:true});
+ const rootMessage=JSON.parse(line('root'));rootMessage.sessionId='root-session';
+ const agentLog=(id,parent,depth)=>JSON.stringify({type:'agent_metadata',agentType:'general-purpose',parentAgentId:parent,spawnDepth:depth})+'\n'+JSON.stringify({type:'assistant',timestamp:`2026-09-11T10:0${depth}:00Z`,sessionId:'root-session',cwd:'C:/example',message:{id,model:'claude-sonnet-4-6',usage:{input_tokens:10,output_tokens:2}}})+'\n';
+ await fs.writeFile(path.join(project,'root-session.jsonl'),JSON.stringify(rootMessage)+'\n');
+ await fs.writeFile(path.join(agents,'agent-child.jsonl'),agentLog('child-message','root-session',1));
+ await fs.writeFile(path.join(agents,'agent-grandchild.jsonl'),agentLog('grandchild-message','child',2));
+ const result=await new Store(path.join(dir,'cache.json')).scan(settings),byId=new Map(result.sessions.map(session=>[session.sessionId,session]));
+ assert.equal(result.sessions.length,3);assert.equal(byId.get('child').parentId,'root-session');assert.equal(byId.get('grandchild').parentId,'child');assert.equal(byId.get('grandchild').relationEvidence,'claude.agent_metadata.parentAgentId');
 });
 test('Event identifiers only deduplicate within their own session',async t=>{
  const {dir,logs}=await fixture(t);await fs.writeFile(path.join(logs,'one.jsonl'),codexMeta('one')+codexRecord('one','shared'));

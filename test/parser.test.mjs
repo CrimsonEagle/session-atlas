@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import {PARSER_VERSION,newState,ingest,sessionEvents} from '../lib/parser.mjs';
 import {costFor} from '../lib/pricing.mjs';
 const time='2026-09-11T10:00:00.000Z';
@@ -38,6 +39,37 @@ test('Codex session metadata preserves only explicit task relationships',()=>{
 test('Claude message parentUuid is not inferred as a session relationship',()=>{
  const s=newState('claude','test.jsonl');ingest(s,{timestamp:time,type:'assistant',sessionId:'session',parentUuid:'message-parent',message:{id:'message',model:'claude-sonnet-4-6',usage:{input_tokens:1,output_tokens:1}}});
  assert.equal(s.parentId,'');assert.equal(s.relationType,'');assert.equal(s.forkedFromId,'');
+});
+test('Claude subagent paths and metadata preserve direct parents at arbitrary depth',()=>{
+ const top=newState('claude',path.join('projects','root-session','subagents','agent-child.jsonl'));
+ assert.equal(top.id,'child');assert.equal(top.parentId,'root-session');assert.equal(top.relationType,'subagent');assert.equal(top.relationEvidence,'claude.subagents_directory');
+ ingest(top,{type:'agent_metadata',agentType:'Explore',parentAgentId:'root-session',spawnDepth:1});
+ assert.equal(top.parentId,'root-session');assert.equal(top.relationEvidence,'claude.agent_metadata.parentAgentId');
+ const nested=newState('claude',path.join('projects','root-session','subagents','agent-grandchild.jsonl'));
+ ingest(nested,{type:'agent_metadata',parentAgentId:'child',spawnDepth:2});
+ assert.equal(nested.id,'grandchild');assert.equal(nested.parentId,'child');assert.equal(nested.relationType,'subagent');assert.equal(nested.subagent,true);
+});
+test('Conflicting Claude parent metadata is marked ambiguous',()=>{
+ const s=newState('claude',path.join('projects','root','subagents','agent-child.jsonl'));
+ ingest(s,{type:'agent_metadata',parentAgentId:'first'});ingest(s,{type:'agent_metadata',parentAgentId:'second'});
+ assert.equal(s.parentId,'');assert.equal(s.relationType,'ambiguous');assert.match(s.relationEvidence,/conflicting/);
+});
+test('Claude session names are read without timestamps and explicit names win',()=>{
+ const s=newState('claude','session.jsonl');
+ ingest(s,{type:'summary',summary:'Initial summary',sessionId:'session'});
+ ingest(s,{type:'ai-title',aiTitle:'Generated title',sessionId:'session'});
+ ingest(s,{type:'custom-title',customTitle:'  My\nNamed\tSession  ',sessionId:'session'});
+ ingest(s,{type:'ai-title',aiTitle:'Later generated title',sessionId:'session'});
+ assert.equal(s.name,'My Named Session');assert.equal(s.title,'My Named Session');assert.equal(s.nameSource,'claude.custom-title');assert.equal(s.namePriority,3);
+});
+test('Claude title records for another session are ignored',()=>{
+ const s=newState('claude','session.jsonl');ingest(s,{type:'ai-title',aiTitle:'Wrong session',sessionId:'other'});
+ assert.equal(s.name,'');assert.equal(s.title,'');
+});
+test('Claude subagent names belong to their log even when records carry the root session ID',()=>{
+ const s=newState('claude',path.join('projects','root','subagents','agent-child.jsonl'));
+ ingest(s,{type:'agent-name',agentName:'Research agent',sessionId:'root'});
+ assert.equal(s.name,'Research agent');assert.equal(s.nameSource,'claude.agent-name');
 });
 test('Claude streaming chunks merge usage and retain one-hour cache writes',()=>{
  const s=newState('claude','test.jsonl');const x={timestamp:time,type:'assistant',sessionId:'claude-session',message:{id:'m1',model:'claude-opus-4-8',usage:{input_tokens:5,output_tokens:10,cache_read_input_tokens:100,cache_creation_input_tokens:20,cache_creation:{ephemeral_1h_input_tokens:15}}}};

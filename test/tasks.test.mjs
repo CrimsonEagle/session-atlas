@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {taskForest,taskRows,taskView} from '../public/tasks.js';
+import {flattenTaskNode,taskForest,taskRows,taskTreeForSession,taskView} from '../public/tasks.js';
 
 const event=(id,tokens,time='2026-09-15T10:00:00Z',model='gpt')=>({id,time,model,input:tokens,cache:0,write:0,output:0,reasoning:0,cost:tokens/1000});
 const session=(id,{parentId='',relationType='',events=[event(id,10)],lastActivity='2026-09-15T10:00:00Z'}={})=>({id:`codex:${id}`,sessionId:id,tool:'codex',title:id,cwd:'C:/repo',repository:'C:/repo',parentId,relationType,subagent:Boolean(parentId),events,lastActivity});
@@ -27,4 +27,12 @@ test('missing parents, conflicts, self references and cycles stay unassigned wit
 test('forks remain independent tasks and markup offers session navigation',()=>{
  const fork=session('fork',{relationType:'fork'}),child=session('child',{parentId:'fork',relationType:'subagent'}),html=taskView({sessions:[fork,child],compact:String,num:String,costText:row=>String(row.cost),basename:value=>value,toolTag:value=>value,date:String});
  assert.match(html,/<strong>2<\/strong><small>Sessions<\/small>/);assert.match(html,/data-session="codex:child"/);assert.match(html,/Eigen/);assert.match(html,/Mit Kindern/);assert.equal(taskRows([fork,child]).roots.length,1);
+});
+
+test('a session resolves to its complete task tree at arbitrary nesting depth',()=>{
+ const root=session('root'),child=session('child',{parentId:'root',relationType:'subagent'}),grandchild=session('grandchild',{parentId:'child',relationType:'subagent'}),greatGrandchild=session('great-grandchild',{parentId:'grandchild',relationType:'subagent'});
+ const tree=taskTreeForSession(grandchild,[root,child,grandchild,greatGrandchild]);
+ assert.equal(tree.root.session.sessionId,'root');
+ assert.deepEqual(tree.nodes.map(({node,depth})=>[node.session.sessionId,depth]),[['root',0],['child',1],['grandchild',2],['great-grandchild',3]]);
+ assert.equal(flattenTaskNode(tree.root).at(-1).depth,3);
 });
