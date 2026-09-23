@@ -40,6 +40,8 @@ function validateSettings(x) {
 }
 const staticFiles={'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript; charset=utf-8'],'/activity-calendar.js':['activity-calendar.js','text/javascript; charset=utf-8'],'/analytics-core.js':['analytics-core.js','text/javascript; charset=utf-8'],'/charts.js':['charts.js','text/javascript; charset=utf-8'],'/comparison.js':['comparison.js','text/javascript; charset=utf-8'],'/context-history.js':['context-history.js','text/javascript; charset=utf-8'],'/details.js':['details.js','text/javascript; charset=utf-8'],'/limit-history.js':['limit-history.js','text/javascript; charset=utf-8'],'/polling.js':['polling.js','text/javascript; charset=utf-8'],'/session-label.js':['session-label.js','text/javascript; charset=utf-8'],'/tasks.js':['tasks.js','text/javascript; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8'],'/details.css':['details.css','text/css; charset=utf-8'],'/app-icon.png':['app-icon.png','image/png'],'/favicon.png':['favicon.png','image/png'],'/favicon.svg':['favicon.svg','image/svg+xml']};
 staticFiles['/background.js']=['background.js','text/javascript; charset=utf-8'];
+staticFiles['/session-tree.js']=['session-tree.js','text/javascript; charset=utf-8'];
+staticFiles['/session-row.js']=['session-row.js','text/javascript; charset=utf-8'];
 staticFiles['/background.css']=['background.css','text/css; charset=utf-8'];
 staticFiles['/pixi-background.js']=['pixi-background.js','text/javascript; charset=utf-8'];
 staticFiles['/i18n.js']=['i18n.js','text/javascript; charset=utf-8'];

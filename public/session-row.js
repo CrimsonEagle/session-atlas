@@ -1,0 +1,12 @@
+import {sessionLabel,sessionSecondaryId} from './session-label.js';
+
+export function sessionRow(row,{esc,compact,costText,date,basename,toolTag,num}) {
+ const usage=row.displayTotals;
+ const recent=!row.contextOnly&&Date.now()-Date.parse(row.lastActivity)<5*60000;
+ const relation=row.contextOnly?'Parent außerhalb der Auswahl':row.relationType==='guardian_review'?'Prüf-Agent':row.subagent?'Subagent':'Hauptsession';
+ const subtitle=[sessionSecondaryId(row),relation].filter(Boolean).join(' · ');
+ const count=row.descendantCount,childLabel=count===1?'Sub-Session':'Sub-Sessions';
+ const fold=row.hasChildren?`<button type="button" class="session-fold" data-session-fold="${esc(row.id)}" aria-expanded="${!row.collapsed}" aria-label="${esc(sessionLabel(row))}: ${row.collapsed?'Aufklappen':'Zuklappen'} (${num(count)} ${childLabel})" title="${row.collapsed?'Aufklappen':'Zuklappen'}"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m9 5 7 7-7 7" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`:'<span class="session-fold-spacer" aria-hidden="true"></span>';
+ const badge=row.hasChildren?`<span class="session-child-count">${num(count)} ${childLabel}${row.collapsed?' · Summe':''}</span>`:'';
+ return `<tr class="session-tree-row ${row.contextOnly?'context-only':''} ${row.collapsed?'is-collapsed':''}" style="--session-depth:${row.treeDepth||0}"><td><div class="session-cell"><span class="session-tree-connector" aria-hidden="true"></span>${fold}<span class="session-symbol" aria-hidden="true">▤</span><button class="row-button" data-session="${esc(row.id)}"><span class="row-title" title="${esc(sessionLabel(row))}">${esc(sessionLabel(row))}${recent?'<span class="active-pill">Zuletzt aktiv</span>':''}</span><span class="row-subtitle">${esc(subtitle)}</span>${badge}</button></div></td><td>${toolTag(row.tool)}</td><td><span class="repo-name" title="${esc(row.repository)}">${esc(basename(row.repository))}</span><span class="row-subtitle">${esc(row.branch||[...new Set(row.events.map(e=>e.model))].join(', ')||'Keine Nutzungsdaten protokolliert')}</span></td><td class="numeric"><strong>${usage.requests?compact(usage.tokens):'–'}</strong>${row.collapsed?'<span class="row-subtitle">inkl. Sub-Sessions</span>':''}</td><td class="numeric">${usage.requests?costText(usage):'–'}${row.collapsed?'<span class="row-subtitle">inkl. Sub-Sessions</span>':''}</td><td class="numeric muted">${date(row.displayActivity)}</td></tr>`;
+}

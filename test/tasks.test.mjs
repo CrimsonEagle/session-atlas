@@ -25,13 +25,38 @@ test('missing parents, conflicts, self references and cycles stay unassigned wit
 });
 
 test('forks remain independent tasks and markup offers session navigation',()=>{
- const fork=session('fork',{relationType:'fork'}),child=session('child',{parentId:'fork',relationType:'subagent'}),html=taskView({sessions:[fork,child],compact:String,num:String,costText:row=>String(row.cost),basename:value=>value,toolTag:value=>value,date:String});
- assert.match(html,/<strong>2<\/strong><small>Sessions<\/small>/);assert.match(html,/data-session="codex:child"/);assert.match(html,/Eigen/);assert.match(html,/Mit Kindern/);assert.equal(taskRows([fork,child]).roots.length,1);
+ const fork=session('fork',{relationType:'fork'}),child=session('child',{parentId:'fork',relationType:'subagent'}),html=taskView({sessions:[fork,child],expandedTasks:new Set([fork.id]),compact:String,num:String,costText:row=>String(row.cost),basename:value=>value,toolTag:value=>value,date:String});
+ assert.match(html,/<table class="task-table">/);assert.match(html,/<strong>2<\/strong><span class="row-subtitle">Sessions<\/span>/);assert.match(html,/data-session="codex:child"/);assert.match(html,/Eigen/);assert.match(html,/Mit Kindern/);assert.equal(taskRows([fork,child]).roots.length,1);
 });
 
 test('expanded tasks stay open when their markup is rendered again',()=>{
  const root=session('root'),closed=taskView({sessions:[root]}),open=taskView({sessions:[root],expandedTasks:new Set([root.id])});
- assert.match(closed,/data-task-id="codex:root" >/);assert.match(open,/data-task-id="codex:root" open>/);
+ assert.match(closed,/data-task-fold="codex:root" aria-expanded="false"/);
+ assert.match(open,/data-task-fold="codex:root" aria-expanded="true"/);
+ assert.doesNotMatch(closed,/Verteilung auf Agents<\/h3>/);
+ assert.match(open,/Verteilung auf Agents<\/h3>/);
+});
+
+test('task columns replace the sort dropdown and follow the selected direction',()=>{
+ const small=session('small',{events:[event('small',10)]}),large=session('large',{events:[event('large',100)]});
+ const ascending=taskView({sessions:[small,large],sort:'tokens',sortDirection:'asc'});
+ const descending=taskView({sessions:[small,large],sort:'tokens',sortDirection:'desc'});
+ assert.match(ascending,/<option value="tasks" selected>Aufgaben mit Agents<\/option>/);
+ assert.doesNotMatch(ascending,/<select id="sort"/);
+ assert.match(ascending,/data-sort-key="tokens"[^>]*aria-label="Tokens sortieren, aktuell aufsteigend"/);
+ assert.ok(ascending.indexOf('data-task-id="codex:small"')<ascending.indexOf('data-task-id="codex:large"'));
+ assert.ok(descending.indexOf('data-task-id="codex:large"')<descending.indexOf('data-task-id="codex:small"'));
+});
+
+test('task pages count roots while expanded descendants stay with their parent',()=>{
+ const roots=Array.from({length:13},(_,index)=>session(`root-${index}`));
+ const child=session('child',{parentId:'root-0',relationType:'subagent'});
+ const first=taskView({sessions:[...roots,child],sort:'name',sortDirection:'asc',page:0,pageSize:12,expandedTasks:new Set([roots[0].id])});
+ const second=taskView({sessions:[...roots,child],sort:'name',sortDirection:'asc',page:1,pageSize:12,expandedTasks:new Set([roots[0].id])});
+ assert.match(first,/1–12 von 13 Aufgaben/);
+ assert.match(first,/data-session="codex:child"/);
+ assert.match(second,/13–13 von 13 Aufgaben/);
+ assert.doesNotMatch(second,/data-session="codex:child"/);
 });
 
 test('a session resolves to its complete task tree at arbitrary nesting depth',()=>{
