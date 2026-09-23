@@ -11,8 +11,11 @@ import {startupStatus,setStartup,openBrowser} from './lib/windows.mjs';
 import {PriceHistory} from './lib/price-history.mjs';
 import {activeState,prepareState,activateState,activateStateId} from './lib/state-set.mjs';
 import {createBackup,parseBackup,MAX_BACKUP_COMPRESSED} from './lib/backup.mjs';
+import {staticAsset} from './lib/static-assets.mjs';
+import {runtimeRevision} from './lib/runtime-revision.mjs';
 
 const root=path.dirname(fileURLToPath(import.meta.url));
+const revision=runtimeRevision(root);
 const dataRoot=process.env.ATLAS_DATA_DIR||path.join(root,'.local');
 let active=await activeState(dataRoot),dataDir=active.dir;
 await loadPriceCache(dataDir);
@@ -38,15 +41,6 @@ function validateSettings(x) {
  const limitThresholds={};for(const tool of ['codex','claude']){limitThresholds[tool]={};for(const minutes of [300,10080]){const values=x.limitThresholds?.[tool]?.[minutes];if(!Array.isArray(values)||values.length<1||values.length>5||values.some(value=>!Number.isFinite(value)||value<=0||value>100))throw Error('Limitschwellen: 1 bis 5 Prozentwerte zwischen 1 und 100.');limitThresholds[tool][minutes]=[...new Set(values)].sort((a,b)=>a-b);}}
  return {intervalSeconds:x.intervalSeconds,hiddenProviders:[...new Set(x.hiddenProviders)],limitRetentionDays:x.limitRetentionDays,limitThresholds,claudeRoots:x.claudeRoots.map(p=>path.resolve(p)),codexRoots:x.codexRoots.map(p=>path.resolve(p)),prices:x.prices,pricingMode:x.pricingMode,priceEffectiveFrom:x.priceEffectiveFrom?new Date(x.priceEffectiveFrom).toISOString():''};
 }
-const staticFiles={'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript; charset=utf-8'],'/activity-calendar.js':['activity-calendar.js','text/javascript; charset=utf-8'],'/analytics-core.js':['analytics-core.js','text/javascript; charset=utf-8'],'/charts.js':['charts.js','text/javascript; charset=utf-8'],'/comparison.js':['comparison.js','text/javascript; charset=utf-8'],'/context-history.js':['context-history.js','text/javascript; charset=utf-8'],'/details.js':['details.js','text/javascript; charset=utf-8'],'/limit-history.js':['limit-history.js','text/javascript; charset=utf-8'],'/polling.js':['polling.js','text/javascript; charset=utf-8'],'/session-label.js':['session-label.js','text/javascript; charset=utf-8'],'/tasks.js':['tasks.js','text/javascript; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8'],'/details.css':['details.css','text/css; charset=utf-8'],'/app-icon.png':['app-icon.png','image/png'],'/favicon.png':['favicon.png','image/png'],'/favicon.svg':['favicon.svg','image/svg+xml']};
-staticFiles['/background.js']=['background.js','text/javascript; charset=utf-8'];
-staticFiles['/session-tree.js']=['session-tree.js','text/javascript; charset=utf-8'];
-staticFiles['/session-row.js']=['session-row.js','text/javascript; charset=utf-8'];
-staticFiles['/background.css']=['background.css','text/css; charset=utf-8'];
-staticFiles['/pixi-background.js']=['pixi-background.js','text/javascript; charset=utf-8'];
-staticFiles['/i18n.js']=['i18n.js','text/javascript; charset=utf-8'];
-staticFiles['/vendor/pixi-8.21.0.mjs']=['vendor/pixi-8.21.0.mjs','text/javascript; charset=utf-8'];
-staticFiles['/vendor/pixi-csp-8.21.0.mjs']=['vendor/pixi-csp-8.21.0.mjs','text/javascript; charset=utf-8'];
 let mutating=false;
 const restorePlans=new Map();
 async function readBody(req,max){const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>max)throw Object.assign(Error(`Anfrage überschreitet ${Math.round(max/1024/1024)} MB.`),{statusCode:413});chunks.push(chunk);}return Buffer.concat(chunks);}
@@ -73,7 +67,7 @@ const server=http.createServer(async(req,res)=>{
   if(req.headers['sec-fetch-site']==='cross-site')return json(403,{error:'Fremder Ursprung blockiert.'});
   const url=new URL(req.url,origin);
   if(req.method==='GET') {
-   if(url.pathname==='/api/health')return json(200,{app:'session-atlas',version:'1.0.0'});
+   if(url.pathname==='/api/health')return json(200,{app:'session-atlas',version:'1.0.0',revision});
    if(url.pathname==='/api/bootstrap')return json(200,{token,settings,startup:await startupStatus(),rates:effectiveRates(settings.prices),pricing:priceSyncStatus(),priceHistory:priceHistory.status(),dataDir:dataRoot,activeState:active.id,bridgeScript:path.join(root,'bridge','atlas-statusline.mjs')});
    if(url.pathname==='/api/snapshot')return json(200,store.snapshot(settings,{compact:true}));
    if(url.pathname==='/api/limit-history'){
@@ -87,7 +81,8 @@ const server=http.createServer(async(req,res)=>{
    if(url.pathname==='/api/export-data'){
     const snapshot=store.snapshot(settings,{includeLimitHistory:false,includeContextTimeline:false});return json(200,{sessions:snapshot.sessions,pricingMode:snapshot.pricingMode,pricingRuleVersion:snapshot.pricingRuleVersion});
    }
-   if(staticFiles[url.pathname]) {const [file,type]=staticFiles[url.pathname];res.writeHead(200,{'Content-Type':type});return res.end(await fs.readFile(path.join(root,'public',file)));}
+   const asset=staticAsset(url.pathname);
+   if(asset){const [file,type]=asset;let contents;try{contents=await fs.readFile(path.join(root,'public',file));}catch(e){if(e.code==='ENOENT')return json(404,{error:'Nicht gefunden.'});throw e;}res.writeHead(200,{'Content-Type':type});return res.end(contents);}
   }
   if(req.method==='POST') {
    if(req.headers['x-atlas-token']!==token)return json(403,{error:'Sitzung abgelaufen. Bitte Seite neu laden.'});

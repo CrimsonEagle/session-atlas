@@ -7,6 +7,7 @@ import net from 'node:net';
 import http from 'node:http';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
+import {runtimeRevision} from '../lib/runtime-revision.mjs';
 
 test('HTTP API is local, rejects foreign origins/mutations, validates settings and shuts down',async t=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'session-atlas-http-'));
@@ -15,8 +16,9 @@ test('HTTP API is local, rejects foreign origins/mutations, validates settings a
  const child=spawn(process.execPath,['server.mjs'],{cwd:process.cwd(),env:{...process.env,ATLAS_PORT:String(port),ATLAS_DATA_DIR:dir},windowsHide:true,stdio:['ignore','pipe','pipe']});
  t.after(async()=>{if(child.exitCode===null){child.kill();await once(child,'exit');}if(path.dirname(dir)!==os.tmpdir()||!path.basename(dir).startsWith('session-atlas-http-'))throw Error('Unexpected cleanup path');await fs.rm(dir,{recursive:true,force:true});});
  await once(child.stdout,'data');const base=`http://127.0.0.1:${port}`;
+ assert.equal((await(await fetch(base+'/api/health')).json()).revision,runtimeRevision(process.cwd()));
  assert.equal((await fetch(base+'/')).status,200);
- for(const [asset,type] of [['i18n.js','text/javascript'],['background.js','text/javascript'],['session-tree.js','text/javascript'],['session-row.js','text/javascript'],['pixi-background.js','text/javascript'],['vendor/pixi-8.21.0.mjs','text/javascript'],['vendor/pixi-csp-8.21.0.mjs','text/javascript'],['background.css','text/css'],['app-icon.png','image/png'],['favicon.png','image/png']]){
+ for(const [asset,type] of [['i18n.js','text/javascript'],['background.js','text/javascript'],['session-tree.js','text/javascript'],['session-row.js','text/javascript'],['group-select.js','text/javascript'],['pixi-background.js','text/javascript'],['vendor/pixi-8.21.0.mjs','text/javascript'],['vendor/pixi-csp-8.21.0.mjs','text/javascript'],['background.css','text/css'],['app-icon.png','image/png'],['favicon.png','image/png']]){
   const response=await fetch(base+'/'+asset);
   assert.equal(response.status,200);
   assert.ok(response.headers.get('content-type').startsWith(type));

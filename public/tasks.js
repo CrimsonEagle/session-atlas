@@ -1,6 +1,7 @@
 import {totals} from './analytics-core.js';
 import {sortRows,sortableHeader} from './charts.js';
 import {sessionLabel,sessionSecondaryId} from './session-label.js';
+import {groupSelect} from './group-select.js';
 
 const childRelations=new Set(['subagent','guardian_review']);
 const keyFor=session=>`${session.tool}:${session.sessionId}`;
@@ -69,7 +70,7 @@ export function taskTreeForSession(session,allSessions) {
  return null;
 }
 
-export function taskView({sessions,allSessions=sessions,taskData=null,sort='activity',sortDirection='desc',expandedTasks=new Set(),page=0,pageSize=12,esc=String,num=String,compact=String,costText=row=>String(row.cost),basename=value=>value,toolTag=value=>value,date=String}) {
+export function taskView({sessions,allSessions=sessions,taskData=null,sort='activity',sortDirection='desc',expandedTasks=new Set(),page=0,pageSize=12,showToolGroup=true,esc=String,num=String,compact=String,costText=row=>String(row.cost),basename=value=>value,toolTag=value=>value,date=String}) {
  const rows=taskData||taskRows(sessions,allSessions);
  const value=(row,key)=>({name:sessionLabel(row.session),tool:row.session.tool,sessions:row.contributing,tokens:row.total.tokens,cost:row.total.unknown===row.total.requests&&row.total.requests?null:row.total.cost,activity:Date.parse(row.lastActivity||'')||null})[key];
  const ordered=sortRows([...rows.roots,...rows.unassigned],sort,sortDirection,value);
@@ -97,5 +98,5 @@ export function taskView({sessions,allSessions=sessions,taskData=null,sort='acti
   return summary+(open?breakdown(root):'');
  };
  const total=ordered.length;
- return `<section class="panel data-table-panel tasks-panel"><div class="panel-head"><div><h2>Aufgaben mit Agents</h2><p>${num(rows.roots.length)} ${rows.roots.length===1?'Aufgabe':'Aufgaben'} · ${num(rows.unassigned.length)} nicht sicher zugeordnet</p></div><div class="table-toolbar"><select id="group" aria-label="Gruppierung"><option value="sessions">Einzelne Sessions</option><option value="tasks" selected>Aufgaben mit Agents</option><option value="repository">Nach Repository</option><option value="tool">Nach KI-Tool</option><option value="model">Nach Modell</option><option value="branch">Nach Branch</option><option value="agent">Hauptsessions / Subagents</option></select></div></div>${total?`<div class="table-wrap"><table class="task-table"><thead><tr>${head('Aufgabe','name')}${head('KI-Tool','tool')}${head('Sessions','sessions',true)}${head('Tokens','tokens',true)}${head('API-Kosten','cost',true)}${head('Letzte Aktivität','activity',true)}</tr></thead><tbody>${shown.map(taskRow).join('')}</tbody></table></div><div class="table-footer"><span>${currentPage*pageSize+1}–${Math.min((currentPage+1)*pageSize,total)} von ${total} ${total===1?'Aufgabe':'Aufgaben'}</span><div class="pagination"><button data-page="-1" ${currentPage===0?'disabled':''} aria-label="Vorherige Seite">‹</button><span>Seite ${currentPage+1} / ${pages}</span><button data-page="1" ${currentPage+1>=pages?'disabled':''} aria-label="Nächste Seite">›</button></div></div>`:'<div class="comparison-empty">Keine Aufgaben für diese Auswahl.</div>'}</section>`;
+ return `<section class="panel data-table-panel tasks-panel"><div class="panel-head"><div><h2>Aufgaben mit Agents</h2><p>${num(rows.roots.length)} ${rows.roots.length===1?'Aufgabe':'Aufgaben'} · ${num(rows.unassigned.length)} nicht sicher zugeordnet</p></div><div class="table-toolbar">${groupSelect('tasks',showToolGroup)}</div></div>${total?`<div class="table-wrap"><table class="task-table"><thead><tr>${head('Aufgabe','name')}${head('KI-Tool','tool')}${head('Sessions','sessions',true)}${head('Tokens','tokens',true)}${head('API-Kosten','cost',true)}${head('Letzte Aktivität','activity',true)}</tr></thead><tbody>${shown.map(taskRow).join('')}</tbody></table></div><div class="table-footer"><span>${currentPage*pageSize+1}–${Math.min((currentPage+1)*pageSize,total)} von ${total} ${total===1?'Aufgabe':'Aufgaben'}</span><div class="pagination"><button data-page="-1" ${currentPage===0?'disabled':''} aria-label="Vorherige Seite">‹</button><span>Seite ${currentPage+1} / ${pages}</span><button data-page="1" ${currentPage+1>=pages?'disabled':''} aria-label="Nächste Seite">›</button></div></div>`:'<div class="comparison-empty">Keine Aufgaben für diese Auswahl.</div>'}</section>`;
 }

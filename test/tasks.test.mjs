@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {flattenTaskNode,taskForest,taskRows,taskTreeForSession,taskView} from '../public/tasks.js';
+import {groupSelect} from '../public/group-select.js';
 
 const event=(id,tokens,time='2026-09-15T10:00:00Z',model='gpt')=>({id,time,model,input:tokens,cache:0,write:0,output:0,reasoning:0,cost:tokens/1000});
 const session=(id,{parentId='',relationType='',events=[event(id,10)],lastActivity='2026-09-15T10:00:00Z'}={})=>({id:`codex:${id}`,sessionId:id,tool:'codex',title:id,cwd:'C:/repo',repository:'C:/repo',parentId,relationType,subagent:Boolean(parentId),events,lastActivity});
@@ -46,6 +47,20 @@ test('task columns replace the sort dropdown and follow the selected direction',
  assert.match(ascending,/data-sort-key="tokens"[^>]*aria-label="Tokens sortieren, aktuell aufsteigend"/);
  assert.ok(ascending.indexOf('data-task-id="codex:small"')<ascending.indexOf('data-task-id="codex:large"'));
  assert.ok(descending.indexOf('data-task-id="codex:large"')<descending.indexOf('data-task-id="codex:small"'));
+});
+
+test('task and session tables offer the same group choices with one visible provider',()=>{
+ const taskMarkup=taskView({sessions:[session('root')],showToolGroup:false});
+ const taskOptions=[...taskMarkup.matchAll(/<option value="([^"]+)"/g)].map(match=>match[1]);
+ const sessionOptions=[...groupSelect('sessions',false).matchAll(/<option value="([^"]+)"/g)].map(match=>match[1]);
+ assert.deepEqual(taskOptions,sessionOptions);
+ assert.equal(taskOptions.length,6);
+ assert.ok(!taskOptions.includes('tool'));
+ assert.match(taskMarkup,/<option value="tasks" selected>Aufgaben mit Agents<\/option>/);
+ const twoProviderOptions=[...groupSelect('tool',true).matchAll(/<option value="([^"]+)"/g)].map(match=>match[1]);
+ assert.equal(twoProviderOptions.length,7);
+ assert.ok(twoProviderOptions.includes('tool'));
+ assert.match(groupSelect('tool',true),/<option value="tool" selected>Nach KI-Tool<\/option>/);
 });
 
 test('task pages count roots while expanded descendants stay with their parent',()=>{
