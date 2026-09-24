@@ -9,7 +9,56 @@ body { isolation: isolate; }
  opacity: .85;
 }
 .atlas-background canvas { display: block; width: 100%; height: 100%; }
+:root[data-background-variant]:not([data-background-variant=streams]) .atlas-background { opacity: 1; }
 :root[data-background=off] .atlas-background { display: none; }
 .background-quality { display: grid; gap: 8px; margin: 18px 0 8px; font-size: 12px; font-weight: 550; }
 .background-quality select { width: 100%; font-weight: 400; }
+.background-variants { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:15px; }
+.background-variant { display:block; position:relative; min-width:0; padding:0; overflow:hidden; border:1px solid var(--line); border-radius:12px; background:var(--surface-soft); text-align:left; transition:border-color .2s, box-shadow .2s, transform .2s; }
+.background-variant:hover { border-color:var(--blue); transform:translateY(-2px); }
+.background-variant.active { border-color:var(--blue); box-shadow:0 0 0 1px var(--blue), 0 10px 26px color-mix(in srgb,var(--blue) 12%,transparent); }
+.background-variant:focus-visible { outline:3px solid var(--blue); outline-offset:3px; }
+.background-preview { display:block; position:relative; height:82px; overflow:hidden; background:radial-gradient(circle at 74% 46%,#263c73 0,#121e3d 38%,#0b142d 78%); }
+.background-preview:after { content:""; position:absolute; inset:0; background:linear-gradient(90deg,#0710203d,transparent 32%,#07102020); pointer-events:none; }
+.background-preview i { position:absolute; display:block; pointer-events:none; }
+.background-preview-streams i { left:-8%; width:120%; height:33px; border-top:1px solid #95adffb0; border-radius:50%; box-shadow:0 -3px 10px #568af24d; transform:rotate(-8deg); animation:preview-stream 7s ease-in-out infinite alternate; }
+.background-preview-streams i:nth-child(1) { top:15%; }
+.background-preview-streams i:nth-child(2) { top:37%; border-color:#ce9bf0; animation-delay:-2s; }
+.background-preview-streams i:nth-child(3) { top:61%; border-color:#68c9d6; animation-delay:-4s; }
+.background-preview-streams i:nth-child(4) { top:82%; border-color:#9084f7; animation-delay:-1s; }
+.background-preview-streams i:nth-child(5) { width:9px; height:9px; left:69%; top:48%; border:0; border-radius:50%; background:#e4ecff; box-shadow:0 0 14px 5px #6886ff; animation:preview-star 3s ease-in-out infinite alternate; }
+.background-preview-orbit { background:radial-gradient(circle at 72% 53%,#344075 0,#1c2a56 17%,#0a1630 70%); }
+.background-preview-orbit i { left:72%; top:52%; border:1px solid #9ca6ff9c; border-radius:50%; transform:translate(-50%,-50%) rotate(-18deg); box-shadow:0 0 12px #778bff55,inset 0 0 10px #798aff28; animation:preview-orbit 8s ease-in-out infinite alternate; }
+.background-preview-orbit i:nth-child(1) { width:27%; height:34%; }
+.background-preview-orbit i:nth-child(2) { width:48%; height:51%; border-color:#8bdded8c; animation-delay:-1s; }
+.background-preview-orbit i:nth-child(3) { left:29%; top:43%; width:55%; height:73%; border-color:#bd92ec8c; animation-delay:-2s; }
+.background-preview-orbit i:nth-child(4) { left:29%; top:43%; width:84%; height:108%; animation-delay:-3s; }
+.background-preview-orbit i:nth-child(5) { left:72%; top:52%; width:7px; height:7px; border:0; background:#ebeeff; box-shadow:0 0 16px 7px #7e83ff; animation:preview-star 3s ease-in-out infinite alternate; }
+.background-preview-aurora { background:linear-gradient(120deg,#08192e,#172b51 56%,#121735); }
+.background-preview-aurora i { left:-15%; width:130%; height:55px; border-radius:50%; transform:rotate(-13deg); filter:blur(10px); animation:preview-aurora 8s ease-in-out infinite alternate; }
+.background-preview-aurora i:nth-child(1) { top:-17%; background:linear-gradient(180deg,transparent,#38c7d88c,transparent); }
+.background-preview-aurora i:nth-child(2) { top:18%; background:linear-gradient(180deg,transparent,#6287ffa6,transparent); animation-delay:-2s; }
+.background-preview-aurora i:nth-child(3) { top:55%; background:linear-gradient(180deg,transparent,#d283ef8c,transparent); animation-delay:-4s; }
+.background-preview-aurora i:nth-child(4) { top:75%; background:linear-gradient(180deg,transparent,#53d3c777,transparent); animation-delay:-1s; }
+.background-preview-aurora i:nth-child(5) { left:7%; top:37%; width:85%; height:36px; background:linear-gradient(90deg,transparent,#b8aaff8c,transparent); filter:blur(14px); }
+.background-preview-constellation { background:radial-gradient(circle at 24% 35%,#263963,#0a152d 72%); }
+.background-preview-constellation i { height:1px; background:linear-gradient(90deg,#7c9ce533,#a4cefaac,#7f9ce433); transform-origin:left center; box-shadow:0 0 7px #a2b7ff70; }
+.background-preview-constellation i:before,.background-preview-constellation i:after { content:""; position:absolute; top:-3px; width:7px; height:7px; border-radius:50%; background:#d1defd; box-shadow:0 0 10px 3px #778cff; }
+.background-preview-constellation i:before { left:0; } .background-preview-constellation i:after { right:0; }
+.background-preview-constellation i:nth-child(1) { left:9%; top:31%; width:32%; transform:rotate(17deg); }
+.background-preview-constellation i:nth-child(2) { left:40%; top:40%; width:37%; transform:rotate(-22deg); }
+.background-preview-constellation i:nth-child(3) { left:22%; top:76%; width:35%; transform:rotate(-43deg); }
+.background-preview-constellation i:nth-child(4) { left:55%; top:59%; width:32%; transform:rotate(22deg); }
+.background-preview-constellation i:nth-child(5) { left:24%; top:77%; width:47%; transform:rotate(5deg); }
+.background-variant-copy { display:flex; align-items:center; min-height:40px; padding:9px 37px 10px 13px; }
+.background-variant-copy strong { display:block; }
+.background-variant-copy strong { color:var(--ink); font-size:13px; line-height:1.3; }
+.background-variant-check { position:absolute; right:12px; bottom:11px; display:grid; place-items:center; width:19px; height:19px; border-radius:50%; background:var(--blue); color:var(--surface); font-size:12px; opacity:0; }
+.background-variant.active .background-variant-check { opacity:1; }
+@keyframes preview-stream { to { transform:translateX(12px) rotate(-5deg); } }
+@keyframes preview-orbit { to { transform:translate(-50%,-50%) rotate(-9deg) scale(1.07); } }
+@keyframes preview-aurora { to { transform:translate(14px,-5px) rotate(-8deg); } }
+@keyframes preview-star { to { opacity:.5; transform:scale(.7); } }
+@media(max-width:760px) { .background-variants { grid-template-columns:1fr; } }
+@media(prefers-reduced-motion:reduce) { .background-preview i { animation:none!important; } .background-variant { transition:none; } }
 @media print { .atlas-background { display: none; } }

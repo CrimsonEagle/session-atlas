@@ -1,31 +1,35 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createBackground,backgroundSize,BACKGROUND_FPS,BACKGROUND_MAX_PIXELS} from '../public/background.js';
+import {createBackground,backgroundSize,BACKGROUND_FPS,BACKGROUND_MAX_PIXELS,BACKGROUND_VARIANTS} from '../public/background.js';
 
-function setup({visible=true,reduced=false,saved=null,savedFps=null,blockedStorage=false,deferred=false,fail=false}={}) {
+function setup({visible=true,reduced=false,saved=null,savedFps=null,savedVariant=null,blockedStorage=false,deferred=false,fail=false}={}) {
  const document=new EventTarget(),window=new EventTarget(),media=new EventTarget(),canvas=new EventTarget();
  const state={},button={setAttribute:(key,value)=>state[key]=value},hint={},fpsSelect={value:''};
- const frames=new Map(),draws=[];let id=0,initializations=0,destroyed=0,resolve;
+ const frames=new Map(),draws=[],sceneVariants=[];
+ const variantButtons=Object.fromEntries(BACKGROUND_VARIANTS.map(value=>[value,{dataset:{backgroundChoice:value},classList:{toggle(){}} ,setAttribute(key,attribute){this[key]=attribute;}}]));
+ let id=0,initializations=0,destroyed=0,resolve;
  document.documentElement={dataset:{}};document.visibilityState=visible?'visible':'hidden';
  document.querySelector=selector=>({'#background-toggle':button,'#background-status':hint,'#background-fps':fpsSelect})[selector];
+ document.querySelectorAll=selector=>selector==='[data-background-choice]'?Object.values(variantButtons):[];
  media.matches=reduced;window.matchMedia=()=>media;
  window.setTimeout=()=>{throw Error('Animation must not create timers');};
  window.requestAnimationFrame=fn=>{frames.set(++id,fn);return id;};window.cancelAnimationFrame=id=>frames.delete(id);
- const stored=new Map([['session-atlas-background',saved],['session-atlas-background-fps',savedFps]]);
+ const stored=new Map([['session-atlas-background',saved],['session-atlas-background-fps',savedFps],['session-atlas-background-variant',savedVariant]]);
  Object.defineProperty(window,'localStorage',{get:()=>{
   if(blockedStorage)throw Error('Storage blocked');
   return {getItem:key=>stored.get(key),setItem:(key,value)=>stored.set(key,value)};
  }});
- const scene={canvas,resize(){},draw:time=>draws.push(time),destroy:()=>destroyed++};
+ const scene={canvas,resize(){},draw:time=>draws.push(time),setVariant:value=>sceneVariants.push(value),destroy:()=>destroyed++};
  const createScene=()=>{initializations++;if(fail)return Promise.reject(Error('WebGL unavailable'));return deferred?new Promise(r=>resolve=r):Promise.resolve(scene);};
  const background=createBackground({document,window,createScene});
- return {document,window,media,canvas,background,stored,state,draws,frames,hint,fpsSelect,
+ return {document,window,media,canvas,background,stored,state,draws,frames,hint,fpsSelect,sceneVariants,variantButtons,
   initializations:()=>initializations,destroyed:()=>destroyed,resolve:()=>resolve(scene),
   motion:()=>document.documentElement.dataset.backgroundMotion,
   visibility:value=>{document.visibilityState=value?'visible':'hidden';document.dispatchEvent(new Event('visibilitychange'));},
   frame:now=>{const [key,fn]=frames.entries().next().value;frames.delete(key);fn(now);},
   toggle:()=>{const event=new Event('click');Object.defineProperty(event,'target',{value:{closest:()=>button}});document.dispatchEvent(event);},
   changeFps:value=>{const event=new Event('change');Object.defineProperty(event,'target',{value:{id:'background-fps',value}});document.dispatchEvent(event);},
+  changeVariant:value=>{const event=new Event('click');Object.defineProperty(event,'target',{value:{closest:selector=>selector==='[data-background-choice]'?variantButtons[value]:null}});document.dispatchEvent(event);},
  };
 }
 
@@ -36,6 +40,29 @@ test('hide/minimize cancels pending frames; stale callbacks never render',async(
  app.visibility(false);assert.equal(app.frames.size,0);staleFrame(1000);
  assert.equal(app.draws.length,before);assert.equal(app.frames.size,0);
  app.visibility(true);assert.equal(app.frames.size,1);
+});
+
+test('background motifs switch immediately, persist, and survive delayed scene loading',async()=>{
+ const app=setup();await app.background.ready;
+ assert.equal(app.background.variant,'streams');
+ app.changeVariant('orbit');
+ assert.equal(app.background.variant,'orbit');
+ assert.equal(app.stored.get('session-atlas-background-variant'),'orbit');
+ assert.equal(app.sceneVariants.at(-1),'orbit');
+ assert.equal(app.variantButtons.orbit['aria-pressed'],'true');
+ assert.equal(app.frames.size,1);
+ app.changeVariant('aurora');app.changeVariant('constellation');
+ assert.equal(app.background.variant,'constellation');
+ assert.equal(app.frames.size,1);
+ app.background.stop();
+
+ const delayed=setup({deferred:true,savedVariant:'aurora'});
+ delayed.changeVariant('orbit');delayed.resolve();await delayed.background.ready;
+ assert.equal(delayed.sceneVariants.at(-1),'orbit');
+ assert.equal(delayed.background.variant,'orbit');
+ const invalid=setup({savedVariant:'<script>'});await invalid.background.ready;
+ assert.equal(invalid.background.variant,'streams');
+ invalid.background.stop();
 });
 
 test('animation progresses and resumes without a hidden-time jump or duplicate loops',async()=>{
