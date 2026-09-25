@@ -3,15 +3,22 @@ import assert from 'node:assert/strict';
 import {createBackground,backgroundSize,BACKGROUND_FPS,BACKGROUND_MAX_PIXELS,BACKGROUND_VARIANTS} from '../public/background.js';
 
 function setup({visible=true,reduced=false,saved=null,savedFps=null,savedVariant=null,blockedStorage=false,deferred=false,fail=false}={}) {
- const document=new EventTarget(),window=new EventTarget(),media=new EventTarget(),canvas=new EventTarget();
+ const document=new EventTarget(),window=new EventTarget(),media=new EventTarget(),colorScheme=new EventTarget(),canvas=new EventTarget();
  const state={},button={setAttribute:(key,value)=>state[key]=value},hint={},fpsSelect={value:''};
  const frames=new Map(),draws=[],sceneVariants=[];
  const variantButtons=Object.fromEntries(BACKGROUND_VARIANTS.map(value=>[value,{dataset:{backgroundChoice:value},classList:{toggle(){}} ,setAttribute(key,attribute){this[key]=attribute;}}]));
- let id=0,initializations=0,destroyed=0,resolve;
+ let id=0,initializations=0,destroyed=0,resolve,appearanceCallback,observerOptions,disconnected=false;
+ const appearances=[];
+ window.MutationObserver=class {
+  constructor(callback){appearanceCallback=callback;}
+  observe(target,options){assert.equal(target,document.documentElement);observerOptions=options;}
+  disconnect(){disconnected=true;}
+ };
  document.documentElement={dataset:{}};document.visibilityState=visible?'visible':'hidden';
  document.querySelector=selector=>({'#background-toggle':button,'#background-status':hint,'#background-fps':fpsSelect})[selector];
  document.querySelectorAll=selector=>selector==='[data-background-choice]'?Object.values(variantButtons):[];
- media.matches=reduced;window.matchMedia=()=>media;
+ media.matches=reduced;colorScheme.matches=false;
+ window.matchMedia=query=>query==='(prefers-color-scheme: dark)'?colorScheme:media;
  window.setTimeout=()=>{throw Error('Animation must not create timers');};
  window.requestAnimationFrame=fn=>{frames.set(++id,fn);return id;};window.cancelAnimationFrame=id=>frames.delete(id);
  const stored=new Map([['session-atlas-background',saved],['session-atlas-background-fps',savedFps],['session-atlas-background-variant',savedVariant]]);
@@ -19,10 +26,12 @@ function setup({visible=true,reduced=false,saved=null,savedFps=null,savedVariant
   if(blockedStorage)throw Error('Storage blocked');
   return {getItem:key=>stored.get(key),setItem:(key,value)=>stored.set(key,value)};
  }});
- const scene={canvas,resize(){},draw:time=>draws.push(time),setVariant:value=>sceneVariants.push(value),destroy:()=>destroyed++};
+ const scene={canvas,resize(){},updateAppearance:()=>appearances.push({...document.documentElement.dataset,systemDark:colorScheme.matches}),draw:time=>draws.push(time),setVariant:value=>sceneVariants.push(value),destroy:()=>destroyed++};
  const createScene=()=>{initializations++;if(fail)return Promise.reject(Error('WebGL unavailable'));return deferred?new Promise(r=>resolve=r):Promise.resolve(scene);};
  const background=createBackground({document,window,createScene});
- return {document,window,media,canvas,background,stored,state,draws,frames,hint,fpsSelect,sceneVariants,variantButtons,
+ return {document,window,media,colorScheme,canvas,background,stored,state,draws,frames,hint,fpsSelect,sceneVariants,variantButtons,appearances,
+  appearance:(theme,palette)=>{Object.assign(document.documentElement.dataset,{theme,palette});if(!disconnected)appearanceCallback();},
+  observerOptions:()=>observerOptions,disconnected:()=>disconnected,
   initializations:()=>initializations,destroyed:()=>destroyed,resolve:()=>resolve(scene),
   motion:()=>document.documentElement.dataset.backgroundMotion,
   visibility:value=>{document.visibilityState=value?'visible':'hidden';document.dispatchEvent(new Event('visibilitychange'));},
@@ -133,6 +142,38 @@ test('reduced motion draws a still frame and responds to live preference changes
  app.media.matches=false;app.media.dispatchEvent(new Event('change'));assert.equal(app.frames.size,1);
  app.media.matches=true;app.media.dispatchEvent(new Event('change'));assert.equal(app.frames.size,0);
  app.visibility(false);const count=app.draws.length;app.window.dispatchEvent(new Event('resize'));assert.equal(app.draws.length,count);
+});
+
+test('theme and palette changes repaint a reduced-motion still without starting animation',async()=>{
+ const app=setup({reduced:true});await app.background.ready;
+ assert.deepEqual(app.observerOptions(),{attributes:true,attributeFilter:['data-theme','data-palette']});
+ const before=app.draws.length;
+ app.appearance('light','ember');
+ assert.equal(app.appearances.at(-1).palette,'ember');
+ assert.equal(app.draws.length,before+1);assert.equal(app.draws.at(-1),0);
+ assert.equal(app.frames.size,0);
+ app.appearance('system','slate');
+ app.colorScheme.matches=true;app.colorScheme.dispatchEvent(new Event('change'));
+ assert.equal(app.appearances.at(-1).systemDark,true);
+ assert.equal(app.appearances.at(-1).theme,'system');assert.equal(app.frames.size,0);
+ app.background.stop();
+ const stopped=app.draws.length;
+ app.appearance('dark','classic');app.colorScheme.dispatchEvent(new Event('change'));
+ assert.equal(app.draws.length,stopped);assert.equal(app.disconnected(),true);
+});
+
+test('appearance changes stay lazy while hidden or disabled and use the latest theme on return',async()=>{
+ const app=setup({saved:'off'});
+ app.appearance('light','lagoon');
+ assert.equal(app.initializations(),0);
+ app.toggle();await app.background.ready;
+ assert.equal(app.appearances.at(-1).palette,'lagoon');
+ app.visibility(false);const before=app.draws.length;
+ app.appearance('dark','ember');
+ assert.equal(app.draws.length,before);assert.equal(app.frames.size,0);
+ app.visibility(true);
+ assert.equal(app.appearances.at(-1).palette,'ember');assert.equal(app.frames.size,1);
+ app.background.stop();
 });
 
 test('switch persists and blocked storage does not break pause or resume',async()=>{

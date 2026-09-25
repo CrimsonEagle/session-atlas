@@ -20,6 +20,7 @@ const loadScene = async options => (await import('./pixi-background.js')).create
 export function createBackground({document, window, createScene = loadScene}) {
  const root = document.documentElement;
  const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+ const colorScheme = window.matchMedia('(prefers-color-scheme: dark)');
  const key = 'session-atlas-background';
  const fpsKey = 'session-atlas-background-fps';
  const variantKey = 'session-atlas-background-variant';
@@ -101,6 +102,7 @@ export function createBackground({document, window, createScene = loadScene}) {
   controls();
   if (!visible() || failed || lost) return;
   if (!scene) { loading ||= init(); return; }
+  scene.updateAppearance?.();
   scene.resize();
   scene.draw(elapsed);
   if (active()) schedule();
@@ -131,7 +133,10 @@ export function createBackground({document, window, createScene = loadScene}) {
   sync();
  }
  const listeners = [[document,'visibilitychange',sync], [document,'click',toggle], [document,'click',changeVariant], [document,'change',changeFps],
-  [window,'pagehide',hide], [window,'pageshow',show], [window,'resize',sync], [media,'change',sync]];
+  [window,'pagehide',hide], [window,'pageshow',show], [window,'resize',sync], [media,'change',sync], [colorScheme,'change',sync]];
+ // Observe only appearance attributes: our own status updates must not retrigger sync.
+ const appearanceObserver = window.MutationObserver ? new window.MutationObserver(sync) : null;
+ appearanceObserver?.observe(root,{attributes:true,attributeFilter:['data-theme','data-palette']});
  for (const [target,type,handler] of listeners) target.addEventListener(type,handler);
  sync();
  return {
@@ -143,6 +148,7 @@ export function createBackground({document, window, createScene = loadScene}) {
   stop() {
    stopped = true;
    pause();
+   appearanceObserver?.disconnect();
    for (const [target,type,handler] of listeners) target.removeEventListener(type,handler);
    if (scene) {
     scene.canvas.removeEventListener('webglcontextlost',contextLost);
