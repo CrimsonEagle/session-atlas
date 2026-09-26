@@ -643,3 +643,10 @@ th{font-size:11px}td{font-size:13px}.row-subtitle{font-size:11px}.table-footer{f
 .limit-history-chart-empty{margin-bottom:18px}
 .limit-history-table-empty{text-align:center;color:var(--muted)}
 @media(max-width:620px){.limit-history-chart{height:220px}.limit-cost-chart{height:220px}}
+:root{--hermes:#278c82;--hermes-soft:#e5f5ef}
+:root[data-theme=dark]{--hermes:#6bd0ba;--hermes-soft:#183b39}
+@media(prefers-color-scheme:dark){:root[data-theme=system]{--hermes:#6bd0ba;--hermes-soft:#183b39}}
+.metric-note .hermes{color:var(--hermes)}
+.dot.hermes{background:var(--hermes)}
+.tool-logo.hermes{background:var(--hermes-soft);color:var(--hermes)}
+.source-card.hermes-source{border-top:2px solid color-mix(in srgb,var(--hermes) 58%,var(--line))}

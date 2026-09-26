@@ -1,10 +1,11 @@
+import {TOOL_IDS,toolDefinition} from './tools.js';
 // Shared chart building blocks: one bar-series renderer and one tooltip engine for every chart in
 // the app. Native title attributes are deliberately not used anywhere: their delay makes a dense
 // chart feel dead, they cannot show the provider split, and they never appear for keyboard users.
 // Anything hoverable therefore carries a data-tip payload and lives inside a [data-tip-host], the
 // element the floating box is positioned against.
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const tones=new Set(['codex','claude','input','cache','write','output','neutral']);
+const tones=new Set([...TOOL_IDS,'input','cache','write','output','neutral']);
 
 // payload: {title, rows:[[label,value,tone]], total:[label,value], note}
 export function tipAttr(payload){return `data-tip="${esc(JSON.stringify(payload))}"`;}
@@ -64,17 +65,17 @@ export function axisLabel(key,period,locale='de-DE'){
  return period==='month'?date.toLocaleDateString(locale,{month:'short',year:'2-digit'}):date.toLocaleDateString(locale,{day:'2-digit',month:'short'});
 }
 
-// rows: [{key,codex,claude}] with every period between first and last present, so the hover zones
+// rows: [{key,...toolTotals}] with every period between first and last present, so the hover zones
 // tile the whole plot and an empty period reads as an explicit zero instead of a gap.
 export function seriesChart({rows,format,period='day',width=730,height=220,idPrefix='chart',title='',selectable=false,selectedKey=null,tools=['codex','claude'],locale='de-DE'}){
- const visibleTools=tools.filter(tool=>tool==='codex'||tool==='claude'),names={codex:'Codex',claude:'Claude Code'};
+ const visibleTools=tools.filter(tool=>TOOL_IDS.includes(tool));
  const max=Math.max(1,...rows.map(row=>visibleTools.reduce((sum,tool)=>sum+(row[tool]||0),0)));
  const scale=[0,1,2,3].map(index=>format(max*(1-index/3)));
  // 84 is the tuned gutter of the overview chart; wider scale labels (money) push it out further.
  const left=Math.max(84,Math.min(124,Math.round(Math.max(...scale.map(label=>label.length))*6.2)+14));
  const top=17,plotW=width-14-left,plotH=height-65,step=plotW/Math.max(1,rows.length),bar=Math.min(28,step*.58);
  const every=Math.max(1,Math.ceil(rows.length/Math.max(4,Math.round(width/95))));
- const gradients={codex:`<linearGradient id="${idPrefix}-codex" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7390f3"/><stop offset="1" stop-color="#4868d8"/></linearGradient>`,claude:`<linearGradient id="${idPrefix}-claude" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e99b7f"/><stop offset="1" stop-color="#d97757"/></linearGradient>`};
+ const gradients=Object.fromEntries(visibleTools.map(tool=>{const definition=toolDefinition(tool);return [tool,`<linearGradient id="${idPrefix}-${tool}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${definition.colorStart}"/><stop offset="1" stop-color="${definition.colorEnd}"/></linearGradient>`];}));
  let svg=`<defs>${visibleTools.map(tool=>gradients[tool]).join('')}</defs>`;
  scale.forEach((label,index)=>{const y=top+plotH*index/3;svg+=`<line class="grid-line" x1="${left}" y1="${y}" x2="${width-14}" y2="${y}"/><text x="${left-9}" y="${y+4}" text-anchor="end">${esc(label)}</text>`;});
  svg+=`<line class="chart-axis" x1="${left}" y1="${top+plotH}" x2="${width-14}" y2="${top+plotH}"/>`;
@@ -82,7 +83,7 @@ export function seriesChart({rows,format,period='day',width=730,height=220,idPre
   const x=left+index*step+(step-bar)/2,total=visibleTools.reduce((sum,tool)=>sum+(row[tool]||0),0);
   const heights=Object.fromEntries(visibleTools.map(tool=>[tool,row[tool]?Math.max(2,row[tool]/max*plotH):0]));
   const selected=selectable&&row.key===selectedKey;
-  const payload={title:bucketLabel(row.key,period,locale),rows:visibleTools.map(tool=>[names[tool],format(row[tool]||0),tool]),total:['Gesamt',format(total)],note:selectable?(selected?'Ausgewählt · erneut anklicken, um den Filter aufzuheben':'Anklicken, um die Daten darunter zu filtern'):undefined};
+  const payload={title:bucketLabel(row.key,period,locale),rows:visibleTools.map(tool=>[toolDefinition(tool).shortName==='Codex'?'Codex':toolDefinition(tool).name,format(row[tool]||0),tool]),total:['Gesamt',format(total)],note:selectable?(selected?'Ausgewählt · erneut anklicken, um den Filter aufzuheben':'Anklicken, um die Daten darunter zu filtern'):undefined};
   const interaction=selectable?` role="button" aria-pressed="${selected}" data-chart-bucket="${esc(row.key)}" data-chart-period="${esc(period)}"`:' role="img"';
   let stacked=0;const bars=visibleTools.map(tool=>{stacked+=heights[tool];return `<rect class="chart-bar ${tool}" fill="url(#${idPrefix}-${tool})" x="${x}" y="${top+plotH-stacked}" width="${bar}" height="${heights[tool]}" rx="3"/>`;}).join('');
   svg+=`<g class="chart-column${selectable?' selectable':''}${selected?' selected':''}" tabindex="0"${interaction} aria-label="${esc(tipLabel(payload))}" ${tipAttr(payload)}><rect class="chart-hover-zone" x="${left+index*step}" y="${top}" width="${step+.35}" height="${plotH}" rx="4"/>${bars}</g>`;

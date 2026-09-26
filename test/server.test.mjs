@@ -11,7 +11,7 @@ import {runtimeRevision} from '../lib/runtime-revision.mjs';
 
 test('HTTP API is local, rejects foreign origins/mutations, validates settings and shuts down',async t=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'session-atlas-http-'));
- await fs.writeFile(path.join(dir,'settings.json'),JSON.stringify({intervalSeconds:30,claudeRoots:[],codexRoots:[],prices:{}}));
+ await fs.writeFile(path.join(dir,'settings.json'),JSON.stringify({intervalSeconds:30,claudeRoots:[],codexRoots:[],hermesRoots:[],prices:{}}));
  const reserve=net.createServer();reserve.listen(0,'127.0.0.1');await once(reserve,'listening');const port=reserve.address().port;await new Promise(r=>reserve.close(r));
  const child=spawn(process.execPath,['server.mjs'],{cwd:process.cwd(),env:{...process.env,ATLAS_PORT:String(port),ATLAS_DATA_DIR:dir},windowsHide:true,stdio:['ignore','pipe','pipe']});
  t.after(async()=>{if(child.exitCode===null){child.kill();await once(child,'exit');}if(path.dirname(dir)!==os.tmpdir()||!path.basename(dir).startsWith('session-atlas-http-'))throw Error('Unexpected cleanup path');await fs.rm(dir,{recursive:true,force:true});});

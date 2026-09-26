@@ -200,6 +200,7 @@ const phrases={
  'Nach Modell':'By model',
  'Nach Branch':'By branch',
  'Hauptsessions / Subagents':'Main sessions / subagents',
+ 'Verknüpfte Session':'Linked session',
  'Letzte Aktivität':'Latest activity',
  'Meiste Tokens':'Most tokens',
  'Höchste Kosten':'Highest cost',
@@ -463,7 +464,21 @@ Object.assign(phrases,{
  'KI-Tool':'AI tool','KI-Tools':'AI tools','Kennzahlen':'Metrics','Modelle anzeigen':'Show models','Diagramm-Metrik':'Chart metric',
  'Eigene Preise lassen sich in den':'Custom prices can be added in',' ergänzen.':'.','ergänzen.':'.','Vorherige Seite':'Previous page','Nächste Seite':'Next page',
  'aufsteigend':'ascending','absteigend':'descending','Aktualisiert':'Updated','Sichtbare Provider':'Visible providers','anzeigen':'show','Stände':'snapshots',
- 'Mit ':'Create a ZIP with ',' ein ZIP ohne persönliche Daten erstellen. Node.js 22+ genügt.':' without personal data. Node.js 22+ is sufficient.'
+ 'Mit ':'Create a ZIP with ',' ein ZIP ohne persönliche Daten erstellen. Node.js 22.13+ ist erforderlich.':' without personal data. Node.js 22.13+ is required.',
+ 'Lokale Logordner für deine KI-Tools.':'Local log folders for your AI tools.',
+ 'Sichtbare KI-Tools':'Visible AI tools',
+ 'Blendet Nutzungsdaten, Diagramme und Filter aus. Die gespeicherten Daten bleiben erhalten.':'Hides usage data, charts, and filters. Saved data is retained.',
+ 'Neue Quellen werden nach dem Einrichten in den Auswertungen angezeigt. Die Auswahl wird mit den Einstellungen gespeichert.':'New sources appear in analytics after setup. This selection is saved with your settings.',
+ 'KI-Tools, Pfade, Intervall, Preise und Limits werden gemeinsam übernommen.':'AI tools, paths, interval, prices, and limits are saved together.',
+ 'Keine KI-Tools aktiv':'No active AI tools',
+ 'Aktiviere eine Quelle in den Einstellungen, um Nutzungsdaten anzuzeigen.':'Enable a source in Settings to display usage data.',
+ 'Der Standardpfad wird automatisch erkannt. Atlas liest state.db und die Datenbanken benannter Hermes-Profile; weitere absolute Hermes-Verzeichnisse kannst du hier ergänzen. Dafür ist Node.js 22.13+ erforderlich.':'The default path is detected automatically. Atlas reads state.db and databases of named Hermes profiles; you can add other absolute Hermes directories here. Node.js 22.13+ is required.',
+ 'Ruft LiteLLM, models.dev und OpenRouter ab. Manuelle Einträge behalten Vorrang; Sessiondaten werden nicht übertragen.':'Fetches LiteLLM, models.dev, and OpenRouter. Manual entries take priority; session data is not transmitted.',
+ 'Eigene Preise in USD pro Million Tokens. Der Modellname muss exakt dem Log entsprechen; für OpenRouter-Routen openrouter:anbieter/modell verwenden.':'Custom prices in USD per million tokens. The model name must match the log exactly; use openrouter:vendor/model for OpenRouter routes.',
+ 'von Hermes gemeldet':'reported by Hermes',
+ 'Nutzungsmesspunkte':'Usage measurements',
+ 'Hermes-Kosten gemeldet; übrige Kosten geschätzt':'Hermes costs reported; other costs estimated',
+ 'API-Kosten':'API costs'
 });
 
 const replacements=Object.entries(phrases).sort((a,b)=>b[0].length-a[0].length);

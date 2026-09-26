@@ -1,3 +1,4 @@
+import {TOOL_IDS} from './tools.js';
 export const tokenCount=event=>(event?.input||0)+(event?.cache||0)+(event?.write||0)+(event?.output||0);
 
 const validTime=value=>{const time=value instanceof Date?value.getTime():Date.parse(value);return Number.isFinite(time)?time:null;};
@@ -75,7 +76,8 @@ export function totals(events=[]) {
  return events.reduce((summary,event)=>{
   for(const key of ['input','cache','write','output','reasoning'])summary[key]+=event?.[key]||0;
   summary.tokens+=tokenCount(event);summary.cost+=event?.cost||0;
-  summary.unknown+=Number(event?.cost===null);summary.requests++;
+  const count=Number.isFinite(event?.requestCount)?Math.max(0,event.requestCount):1;
+  summary.unknown+=event?.cost===null?count:0;summary.requests+=count;
   return summary;
  },{input:0,cache:0,write:0,output:0,reasoning:0,tokens:0,cost:0,unknown:0,requests:0});
 }
@@ -173,13 +175,13 @@ export function bucketSeries(sessions=[],metric='tokens',maxBuckets=60) {
  // partial weeks/months and daylight-saving transitions.
  const period=bucketCount('day')<=limit?'day':bucketCount('week')<=limit?'week':'month';
  const keyFor=value=>periodKey(value,period);
- const map=new Map();
- for(const event of events){const key=keyFor(event.time);if(!map.has(key))map.set(key,{key,codex:0,claude:0});const value=metric==='cost'?(event.cost||0):metric==='requests'?1:tokenCount(event);map.get(key)[event.tool]+=value;}
+ const map=new Map(),blank=key=>({key,...Object.fromEntries(TOOL_IDS.map(tool=>[tool,0]))});
+ for(const event of events){const key=keyFor(event.time);if(!map.has(key))map.set(key,blank(key));const value=metric==='cost'?(event.cost||0):metric==='requests'?(event.requestCount??1):tokenCount(event);map.get(key)[event.tool]=(map.get(key)[event.tool]||0)+value;}
  // Idle periods become explicit zero buckets: a chart axis must not skip time, and the hover zones
  // of the rendered chart have to tile the plot without gaps.
  const keys=[...map.keys()].sort(),cursor=new Date(keys[0]+'T00:00:00'),count=bucketCount(period),rows=[];
  for(let index=0;index<count;index++) {
-  const key=keyFor(cursor);rows.push(map.get(key)||{key,codex:0,claude:0});
+  const key=keyFor(cursor);rows.push(map.get(key)||blank(key));
   if(period==='month')cursor.setMonth(cursor.getMonth()+1);else cursor.setDate(cursor.getDate()+(period==='week'?7:1));
  }
  return {period,rows};
@@ -207,7 +209,7 @@ export function comparisonRows(currentSessions=[],previousSessions=[],kind='repo
 export function relativeSeries(sessions=[],range,metric='tokens') {
  if(!range||range.end<range.start)return [];
  const byDay=new Map();
- for(const session of sessions)for(const event of session.events||[]){const key=calendarKey(event.time);if(!key)continue;const value=metric==='cost'?(event.cost||0):metric==='requests'?1:tokenCount(event);byDay.set(key,(byDay.get(key)||0)+value);}
+ for(const session of sessions)for(const event of session.events||[]){const key=calendarKey(event.time);if(!key)continue;const value=metric==='cost'?(event.cost||0):metric==='requests'?(event.requestCount??1):tokenCount(event);byDay.set(key,(byDay.get(key)||0)+value);}
  const result=[],cursor=localMidnight(range.start),last=localMidnight(range.end);let index=0;
  while(cursor<=last&&index<370){const key=calendarKey(cursor);result.push({index,key,value:byDay.get(key)||0});cursor.setDate(cursor.getDate()+1);index++;}
  return result;

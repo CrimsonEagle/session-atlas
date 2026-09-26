@@ -356,3 +356,4 @@ button.detail-agent-link:hover{background:var(--detail-indigo-soft)}
 }
 .limit-history-point.window-300>circle:first-child{stroke:var(--detail-indigo)}
 .limit-history-point.window-10080>circle:first-child{stroke:var(--detail-violet)}
+.detail-chart-legend .dot.hermes{background:var(--hermes)}

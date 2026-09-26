@@ -3,7 +3,7 @@ import {sortRows,sortableHeader} from './charts.js';
 import {sessionLabel,sessionSecondaryId} from './session-label.js';
 import {groupSelect} from './group-select.js';
 
-const childRelations=new Set(['subagent','guardian_review']);
+const childRelations=new Set(['subagent','guardian_review','related']);
 const keyFor=session=>`${session.tool}:${session.sessionId}`;
 const activity=session=>session.lastActivity||session.started||'';
 
@@ -82,7 +82,7 @@ export function taskView({sessions,allSessions=sessions,taskData=null,sort='acti
   for(const {node} of contributing)for(const event of node.session.events)models.set(event.model,(models.get(event.model)||0)+(event.input||0)+(event.cache||0)+(event.write||0)+(event.output||0));
   const modelRows=[...models].sort((a,b)=>b[1]-a[1]).slice(0,5),agentRows=contributing.sort((a,b)=>b.node.own.tokens-a.node.own.tokens).slice(0,5);
   const ownRows=nodes.map(({node,depth})=>{
-   const session=node.session,secondary=sessionSecondaryId(session),relation=node.contextOnly?'Orientierung · außerhalb der Auswahl':session.relationType==='guardian_review'?'Prüf-Agent':session.subagent?'Subagent':'Hauptsession';
+   const session=node.session,secondary=sessionSecondaryId(session),relation=node.contextOnly?'Orientierung · außerhalb der Auswahl':session.relationType==='guardian_review'?'Prüf-Agent':session.relationType==='related'?'Verknüpfte Session':session.subagent?'Subagent':'Hauptsession';
    return `<tr class="session-tree-row task-breakdown-row ${node.contextOnly?'context-only':''}" style="--session-depth:${depth+1}"><td><div class="session-cell"><span class="session-tree-connector" aria-hidden="true"></span><span class="session-fold-spacer" aria-hidden="true"></span><span class="session-symbol" aria-hidden="true">▤</span><button class="row-button" data-session="${esc(session.id)}"><span class="row-title" title="${esc(sessionLabel(session))}">${esc(sessionLabel(session))}</span><span class="row-subtitle">${esc([secondary,relation,'Eigen'].filter(Boolean).join(' · '))}</span></button></div></td><td>${toolTag(session.tool)}</td><td class="numeric">${node.contextOnly?'–':'1'}</td><td class="numeric"><strong>${node.contextOnly?'–':compact(node.own.tokens)}</strong>${node.children.length?`<span class="row-subtitle">Mit Kindern: ${compact(node.total.tokens)}</span>`:''}</td><td class="numeric">${node.contextOnly?'–':costText(node.own)}</td><td class="numeric muted">${date(session.lastActivity)}</td></tr>`;
   }).join('');
   const distributions=`<tr class="task-distribution-row"><td colspan="6"><div class="task-distributions"><section><h3>Verteilung auf Agents</h3>${agentRows.map(({node})=>`<button data-session="${esc(node.session.id)}"><span title="${esc(sessionLabel(node.session))}">${esc(sessionLabel(node.session))}</span><strong>${compact(node.own.tokens)}</strong></button>`).join('')||'<p>Keine Nutzungsdaten im Zeitraum.</p>'}</section><section><h3>Verteilung auf Modelle</h3>${modelRows.map(([model,tokens])=>`<div><span>${esc(model)}</span><strong>${compact(tokens)}</strong></div>`).join('')||'<p>Keine Modelle im Zeitraum.</p>'}</section></div></td></tr>`;

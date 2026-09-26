@@ -16,3 +16,12 @@ test('backup round-trip validates checksums and atomically activates a prepared 
 test('backup rejects incomplete containers before changing state',async()=>{
  assert.throws(()=>parseBackup(Buffer.from('not gzip')),/beschädigt/);
 });
+
+test('backup preview includes locally cached Hermes sessions and source roots',async t=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'atlas-hermes-backup-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));
+ await fs.writeFile(path.join(root,'settings.json'),JSON.stringify({hermesRoots:['/home/user/.hermes']}));
+ await fs.writeFile(path.join(root,'usage-cache.json'),JSON.stringify({version:7,files:{},hermesSources:{'/home/user/.hermes':{sessions:{one:{tool:'hermes',id:'root-id:default:one'}}}}}));
+ const backup=await createBackup(root),preview=parseBackup(backup.buffer).preview;
+ assert.equal(preview.sessionCount,1);
+ assert.deepEqual(preview.sourceRoots,[{tool:'hermes',path:'/home/user/.hermes'}]);
+});

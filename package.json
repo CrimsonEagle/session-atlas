@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Portable, local usage analytics for Claude Code and Codex",
-  "engines": { "node": ">=22" },
+  "description": "Portable, local usage analytics for Claude Code, Codex, and Hermes Agent",
+  "engines": { "node": ">=22.13" },
   "scripts": { "start": "node server.mjs", "test": "node --test", "package": "node scripts/package.mjs" }
 }

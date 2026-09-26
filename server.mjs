@@ -14,6 +14,7 @@ import {activeState,prepareState,activateState,activateStateId} from './lib/stat
 import {createBackup,parseBackup,MAX_BACKUP_COMPRESSED} from './lib/backup.mjs';
 import {staticAsset} from './lib/static-assets.mjs';
 import {runtimeRevision} from './lib/runtime-revision.mjs';
+import {defaultHermesHome,hermesRootId,validateHermesRoots} from './lib/hermes-local.mjs';
 
 const root=path.dirname(fileURLToPath(import.meta.url));
 const revision=runtimeRevision(root);
@@ -26,7 +27,7 @@ if(isIP(bindHost)!==4||bindHost==='0.0.0.0')throw Error('ATLAS_HOST muss eine ko
 const origin=`http://${bindHost}:${port}`;
 const token=randomBytes(32).toString('hex');
 const defaultThresholds={codex:{300:[80,95],10080:[80,95]},claude:{300:[80,95],10080:[80,95]}};
-const defaults={intervalSeconds:30,hiddenProviders:[],limitRetentionDays:90,limitThresholds:defaultThresholds,claudeRoots:[path.join(process.env.CLAUDE_CONFIG_DIR||path.join(os.homedir(),'.claude'),'projects')],codexRoots:[path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'sessions'),path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'archived_sessions')],prices:{},pricingMode:'current',priceEffectiveFrom:''};
+const defaults={intervalSeconds:30,hiddenProviders:[],limitRetentionDays:90,limitThresholds:defaultThresholds,claudeRoots:[path.join(process.env.CLAUDE_CONFIG_DIR||path.join(os.homedir(),'.claude'),'projects')],codexRoots:[path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'sessions'),path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'archived_sessions')],hermesRoots:[defaultHermesHome()],prices:{},pricingMode:'current',priceEffectiveFrom:''};
 let settings={...defaults};
 try {settings={...defaults,...JSON.parse(await fs.readFile(path.join(dataDir,'settings.json'),'utf8'))};}catch{}
 let priceHistory=new PriceHistory(path.join(dataDir,'price-history.json'));await priceHistory.load();
@@ -34,7 +35,7 @@ if(!priceHistory.snapshots.length)await priceHistory.capture({overrides:settings
 let store=new Store(path.join(dataDir,'usage-cache.json'),priceHistory);await store.load();
 function validateSettings(x) {
  if(!Number.isInteger(x.intervalSeconds)||x.intervalSeconds<10||x.intervalSeconds>3600)throw Error('Aktualisierung: 10 bis 3600 Sekunden.');
- if(!Array.isArray(x.hiddenProviders)||x.hiddenProviders.some(provider=>!['codex','claude'].includes(provider)))throw Error('Ungültige Provider-Sichtbarkeit.');
+ if(!Array.isArray(x.hiddenProviders)||x.hiddenProviders.some(provider=>!['codex','claude','hermes'].includes(provider)))throw Error('Ungültige Provider-Sichtbarkeit.');
  for(const k of ['claudeRoots','codexRoots'])if(!Array.isArray(x[k])||x[k].length>20||x[k].some(p=>typeof p!=='string'||!path.isAbsolute(p)||p.length>2000))throw Error('Bitte gültige absolute Ordnerpfade eintragen.');
  if(!x.prices||typeof x.prices!=='object'||Array.isArray(x.prices))throw Error('Preise müssen ein JSON-Objekt sein.');
  for(const [model,r] of Object.entries(x.prices))if(model.length>120||!Array.isArray(r)||r.length<3||r.length>5||r.some(v=>!Number.isFinite(v)||v<0||v>100000))throw Error('Preise: je Modell 3 bis 5 nichtnegative Zahlen.');
@@ -42,7 +43,7 @@ function validateSettings(x) {
  if(!['current','historical'].includes(x.pricingMode))throw Error('Ungültiger Bewertungsmodus.');
  if(x.priceEffectiveFrom&& !Number.isFinite(Date.parse(x.priceEffectiveFrom)))throw Error('Ungültiger Gültigkeitsbeginn für manuelle Preise.');
  const limitThresholds={};for(const tool of ['codex','claude']){limitThresholds[tool]={};for(const minutes of [300,10080]){const values=x.limitThresholds?.[tool]?.[minutes];if(!Array.isArray(values)||values.length<1||values.length>5||values.some(value=>!Number.isFinite(value)||value<=0||value>100))throw Error('Limitschwellen: 1 bis 5 Prozentwerte zwischen 1 und 100.');limitThresholds[tool][minutes]=[...new Set(values)].sort((a,b)=>a-b);}}
- return {intervalSeconds:x.intervalSeconds,hiddenProviders:[...new Set(x.hiddenProviders)],limitRetentionDays:x.limitRetentionDays,limitThresholds,claudeRoots:x.claudeRoots.map(p=>path.resolve(p)),codexRoots:x.codexRoots.map(p=>path.resolve(p)),prices:x.prices,pricingMode:x.pricingMode,priceEffectiveFrom:x.priceEffectiveFrom?new Date(x.priceEffectiveFrom).toISOString():''};
+ return {intervalSeconds:x.intervalSeconds,hiddenProviders:[...new Set(x.hiddenProviders)],limitRetentionDays:x.limitRetentionDays,limitThresholds,claudeRoots:x.claudeRoots.map(p=>path.resolve(p)),codexRoots:x.codexRoots.map(p=>path.resolve(p)),hermesRoots:validateHermesRoots(x.hermesRoots),prices:x.prices,pricingMode:x.pricingMode,priceEffectiveFrom:x.priceEffectiveFrom?new Date(x.priceEffectiveFrom).toISOString():''};
 }
 let mutating=false;
 const restorePlans=new Map();
@@ -57,7 +58,16 @@ function mappedRestoreFiles(plan,mappings){
  if(pairs.length>20||pairs.some(([from,to])=>!allowed.has(from)||typeof to!=='string'||!path.isAbsolute(to)||to.length>2000))throw Error('Die Quellordner-Zuordnung ist ungültig.');
  const settingsFile=JSON.parse(plan.files['settings.json']),cache=JSON.parse(plan.files['usage-cache.json']),replace=value=>{for(const [from,to] of pairs){const relative=path.relative(from,value);if(relative===''||(!relative.startsWith('..')&&!path.isAbsolute(relative)))return path.join(to,relative);}return value;};
  settingsFile.claudeRoots=(settingsFile.claudeRoots||[]).map(root=>mappings[root]||root);settingsFile.codexRoots=(settingsFile.codexRoots||[]).map(root=>mappings[root]||root);
+ settingsFile.hermesRoots=(settingsFile.hermesRoots||[]).map(root=>mappings[root]||root);
  cache.files=Object.fromEntries(Object.entries(cache.files||{}).map(([file,state])=>{const nextFile=replace(file);return [nextFile,{...state,file:nextFile}];}));
+ cache.hermesSources=Object.fromEntries(Object.entries(cache.hermesSources||{}).map(([root,source])=>{
+  const target=mappings[root]||root,from=`${hermesRootId(root)}:`,to=`${hermesRootId(target)}:`,remap=id=>id?.startsWith(from)?to+id.slice(from.length):id;
+  const sessions=Object.fromEntries(Object.entries(source.sessions||{}).map(([id,state])=>{
+   const events=Object.fromEntries(Object.values(state.events||{}).map(event=>{const eventId=event.id.startsWith(`hermes:${from}`)?`hermes:${to}${event.id.slice(`hermes:${from}`.length)}`:event.id;return [eventId,{...event,id:eventId}];}));
+   return [remap(id),{...state,id:remap(state.id),parentId:remap(state.parentId),file:replace(state.file),events}];
+  }));
+  return [target,{...source,sessions}];
+ }));
  return {...plan.files,'settings.json':JSON.stringify(settingsFile,null,2),'usage-cache.json':JSON.stringify(cache)};
 }
 const server=http.createServer(async(req,res)=>{

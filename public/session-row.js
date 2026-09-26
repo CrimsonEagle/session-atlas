@@ -3,7 +3,7 @@ import {sessionLabel,sessionSecondaryId} from './session-label.js';
 export function sessionRow(row,{esc,compact,costText,date,basename,toolTag,num}) {
  const usage=row.displayTotals;
  const recent=!row.contextOnly&&Date.now()-Date.parse(row.lastActivity)<5*60000;
- const relation=row.contextOnly?'Parent außerhalb der Auswahl':row.relationType==='guardian_review'?'Prüf-Agent':row.subagent?'Subagent':'Hauptsession';
+ const relation=row.contextOnly?'Parent außerhalb der Auswahl':row.relationType==='guardian_review'?'Prüf-Agent':row.relationType==='related'?'Verknüpfte Session':row.subagent?'Subagent':'Hauptsession';
  const subtitle=[sessionSecondaryId(row),relation].filter(Boolean).join(' · ');
  const count=row.descendantCount,childLabel=count===1?'Sub-Session':'Sub-Sessions';
  const fold=row.hasChildren?`<button type="button" class="session-fold" data-session-fold="${esc(row.id)}" aria-expanded="${!row.collapsed}" aria-label="${esc(sessionLabel(row))}: ${row.collapsed?'Aufklappen':'Zuklappen'} (${num(count)} ${childLabel})" title="${row.collapsed?'Aufklappen':'Zuklappen'}"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m9 5 7 7-7 7" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`:'<span class="session-fold-spacer" aria-hidden="true"></span>';
