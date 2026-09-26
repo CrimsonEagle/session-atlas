@@ -54,4 +54,4 @@ Detection of unchanged files still relies on file-system metadata. A content cha
 
 For very large and rapidly growing logs, full prefix verification still requires work proportional to the file size already read. Replacing it with sampling alone would weaken detection of changes in the middle of a file. Very large datasets can also remain constrained by writing the entire JSON cache and generating snapshots.
 
-The running server must be restarted after a code update. If the server is already running, invoking `Start.cmd` again only opens the existing instance. To apply changes, first use “Exit App Completely,” then start it again.
+The running server must be restarted after a code update. If the server is already running, invoking `Start.cmd` on Windows or `Start.sh` on Linux again only opens the existing instance. To apply changes, first use “Exit App Completely,” then start it again.

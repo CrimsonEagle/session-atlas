@@ -7,7 +7,7 @@ import {randomBytes} from 'node:crypto';
 import {Store} from './lib/store.mjs';
 import {effectiveRates} from './lib/pricing.mjs';
 import {loadPriceCache,remotePrices,priceSyncStatus,syncPrices} from './lib/price-sync.mjs';
-import {startupStatus,setStartup,openBrowser} from './lib/windows.mjs';
+import {startupStatus,setStartup,openBrowser} from './lib/platform.mjs';
 import {PriceHistory} from './lib/price-history.mjs';
 import {activeState,prepareState,activateState,activateStateId} from './lib/state-set.mjs';
 import {createBackup,parseBackup,MAX_BACKUP_COMPRESSED} from './lib/backup.mjs';
@@ -68,7 +68,7 @@ const server=http.createServer(async(req,res)=>{
   const url=new URL(req.url,origin);
   if(req.method==='GET') {
    if(url.pathname==='/api/health')return json(200,{app:'session-atlas',version:'1.0.0',revision});
-   if(url.pathname==='/api/bootstrap')return json(200,{token,settings,startup:await startupStatus(),rates:effectiveRates(settings.prices),pricing:priceSyncStatus(),priceHistory:priceHistory.status(),dataDir:dataRoot,activeState:active.id,bridgeScript:path.join(root,'bridge','atlas-statusline.mjs')});
+   if(url.pathname==='/api/bootstrap')return json(200,{token,settings,platform:process.platform,startup:await startupStatus(),rates:effectiveRates(settings.prices),pricing:priceSyncStatus(),priceHistory:priceHistory.status(),dataDir:dataRoot,activeState:active.id,bridgeScript:path.join(root,'bridge','atlas-statusline.mjs')});
    if(url.pathname==='/api/snapshot')return json(200,store.snapshot(settings,{compact:true}));
    if(url.pathname==='/api/limit-history'){
     const tool=url.searchParams.get('tool');if(!['codex','claude'].includes(tool))return json(400,{error:'Ungültiges KI-Tool.'});
@@ -141,5 +141,5 @@ const server=http.createServer(async(req,res)=>{
   json(404,{error:'Nicht gefunden.'});
  }catch(e){console.error(e.message);if(!res.headersSent)json(e.statusCode||400,{error:e.message});else res.end();}
 });
-server.on('error',e=>{console.error(e.code==='EADDRINUSE'?`Port ${port} ist belegt. Starte über Start.cmd oder setze ATLAS_PORT.`:e.message);process.exitCode=1;});
+server.on('error',e=>{console.error(e.code==='EADDRINUSE'?`Port ${port} ist belegt. Starte über ${process.platform==='linux'?'sh Start.sh':'Start.cmd'} oder setze ATLAS_PORT.`:e.message);process.exitCode=1;});
 server.listen(port,'127.0.0.1',()=>{console.log(`Session Atlas: ${origin}`);if(process.argv.includes('--open'))openBrowser(origin).catch(e=>console.error(e.message));});

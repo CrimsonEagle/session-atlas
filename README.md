@@ -1,24 +1,24 @@
 # Session Atlas
 
-Portable, local usage analytics for **Claude Code and OpenAI Codex**. No installer, npm installation, API keys, or external fonts. Analytics work offline; only the optional pricing update requires internet access. Requires **Node.js 22 or newer** and a current browser. Developed for Windows.
+Portable, local usage analytics for **Claude Code and OpenAI Codex** on Windows and Linux. No installer, npm installation, API keys, or external fonts. Analytics work offline; only the optional pricing update requires internet access. Requires **Node.js 22 or newer** and a current browser.
 
 ## Getting Started
 
-**Double-click `Start.cmd`.** The Node process starts in the background and opens the interface at **http://127.0.0.1:4317**. Starting it again opens the existing app. The brief startup window closes automatically.
+On **Windows**, double-click `Start.cmd`. On **Linux**, run `./Start.sh` from the extracted ZIP, or `sh Start.sh` if the executable bit was lost when copying the files. The Node process starts in the background and opens the interface at **http://127.0.0.1:4317**. Starting it again opens the existing app.
 
 Alternatively, run this in the project folder:
 
-```powershell
+```text
 node launcher.mjs
 ```
 
 Or use a visible terminal for diagnostics, then open the address in your browser:
 
-```powershell
+```text
 npm start
 ```
 
-`npm install` is not required. Use `node server.mjs --open` to open the browser when starting from a terminal as well. If a corporate policy blocks Node, PowerShell, or opening browsers, the app does not bypass that policy. Running `node server.mjs` and opening the browser manually does not require PowerShell.
+`npm install` is not required. Use `node server.mjs --open` to open the browser when starting from a terminal as well. On Linux, automatic browser opening uses `xdg-open`; if it is unavailable, open the printed address manually. If a corporate policy blocks Node, PowerShell, or opening browsers, the app does not bypass that policy. Running `node server.mjs` and opening the browser manually does not require PowerShell.
 
 ## Features
 
@@ -38,7 +38,7 @@ npm start
 - CSV export of filtered usage events with precise values, compatible with German Excel. Cell contents are protected against formula execution. Grouping changes only the view; exports remain at event level.
 - Choice between current and historically recorded pricing. Immutable pricing snapshots, effective dates, sources, and rule versions remain locally auditable; two snapshots can be compared for the same period. CSV exports include valuation mode, pricing-snapshot reference, and rule version.
 - Complete local gzip backup with a manifest and SHA-256 checksums, plus controlled restoration. Size, session count, and categories are displayed before import; missing source folders can be remapped. A recovery snapshot is created automatically before every restore.
-- Enable or disable Windows startup in the settings. A shortcut is created in the current user's Startup folder; no administrator rights, service, or installation are required.
+- Enable or disable startup in the settings. Windows uses a shortcut in the current user's Startup folder; Linux uses an XDG autostart desktop entry in the current user's configuration directory. No administrator rights or service are required.
 - “Exit App Completely” stops the Node process. Closing the browser tab leaves the idle server running.
 
 The animated background uses the locally bundled **PixiJS 8.21.0 (MIT)** with WebGL: four selectable motifs (the original flowing data streams, orbital pulses, aurora ribbons, and a constellation network), a selectable FPS cap (30, 60, 120, 144, or monitor maximum; default 60), synchronization with the display, 48 particles (24 on narrow displays), rendering resolution up to 4K (8.29 million pixels), up to 2× pixel density for HiDPI displays, and WebGL antialiasing. Particle size and speed remain independent of pixel density. No blur filters are used; the scene requests a power-efficient graphics adapter. Switching tabs or minimizing cancels the animation frame; there is no animation timer, and PixiJS system/shared tickers remain disabled. On return, animation resumes without a time jump. “Reduced Motion” displays a static motif. Under **Settings → Animated Background**, you can enable or disable the animation, choose a motif, and select the FPS cap. These choices take effect immediately and are stored in this browser. Monitor maximum renders on every animation frame supplied by the browser; the actual frame rate depends on the display, browser, and available performance. If WebGL is unavailable, the app remains usable and shows a notice in the settings. Actual CPU and GPU load depends on the device.
@@ -51,10 +51,10 @@ These folders are read by default:
 
 | Tool | Data source |
 | --- | --- |
-| Claude Code | `%USERPROFILE%\.claude\projects`, including `subagents`; limits additionally come from `%USERPROFILE%\.claude.json`, `%USERPROFILE%\.claude\session-atlas-limits.json`, and the bridge inbox `%USERPROFILE%\.claude\session-atlas-limit-inbox` |
-| Codex | `%USERPROFILE%\.codex\sessions`, `archived_sessions`, and the read-only `state_*.sqlite` metadata database next to them |
+| Claude Code | `~/.claude/projects`, including `subagents`; limits additionally come from `~/.claude.json`, `~/.claude/session-atlas-limits.json`, and the bridge inbox `~/.claude/session-atlas-limit-inbox` |
+| Codex | `~/.codex/sessions`, `archived_sessions`, and the read-only `state_*.sqlite` metadata database next to them |
 
-`CLAUDE_CONFIG_DIR` and `CODEX_HOME` override the respective root directory on first launch. Additional absolute source folders can be added in the settings, including accessible UNC or WSL directories. Data on other computers or in the browser is not collected automatically.
+`~` means the current user's home directory on either system. `CLAUDE_CONFIG_DIR` and `CODEX_HOME` override the respective root directory on first launch. Additional absolute source folders can be added in the settings, including accessible UNC or WSL directories on Windows. Data on other computers or in the browser is not collected automatically.
 
 Session logs, configuration files, and the Codex state database are **read-only**. Credentials are never accessed. Prompts and responses are discarded during parsing. From the Codex database, only the session ID, explicit name, and generated title are read. From `.claude.json`, only the plan, measurement time, and two limit windows are retained; the account identifier, project list, and prompt history are **not** cached. Claude Code invokes the optional status-line bridge when rendering the status line. It writes only the limit block to `session-atlas-limits.json` and, when a value changes, an immutable entry in `session-atlas-limit-inbox`; model, working directory, branch, session ID, and every other input field are discarded. After the server has committed these entries to its local cache, it removes exactly the imported inbox files. It never modifies session logs or Claude configuration. The local cache contains usage events, context samples, session IDs, metadata such as working directory, branch, and session name, and the limit history.
 
@@ -110,13 +110,13 @@ References: [ccusage data format](https://ccusage.com/guide/codex/), [OpenAI pri
 
 ## Sharing with Friends and Colleagues
 
-```powershell
+```text
 npm run package
 ```
 
-This creates **`dist/Session-Atlas-portable.zip`** directly with Node and requires no other programs. The ZIP contains only program files, with **no cache, session data, or personal settings**. Share the ZIP, extract it into a writable folder, and start `Start.cmd`. Do not share the entire working directory, including `.local`.
+This creates **`dist/Session-Atlas-portable.zip`** directly with Node and requires no other programs. The ZIP contains only program files, with **no cache, session data, or personal settings**. Share the ZIP, extract it into a writable folder, and start `Start.cmd` on Windows or `Start.sh` on Linux. Do not share the entire working directory, including `.local`.
 
-The startup shortcut points to the current folder. After moving the app, disable and re-enable startup in the app. PowerShell is opened at startup with a hidden window and without changing the execution policy.
+The startup entry points to the current folder and Node executable. After moving the app or Node, disable and re-enable startup in the app. On Linux the entry is saved to `~/.config/autostart/session-atlas.desktop` by default, or under `$XDG_CONFIG_HOME/autostart` when that variable is set. The desktop session must provide a browser and `xdg-open`. On Windows, PowerShell is opened at startup with a hidden window and without changing the execution policy.
 
 ## Configuration and Development
 
@@ -126,9 +126,17 @@ $env:ATLAS_DATA_DIR = 'C:\Path\to\Atlas-Data'
 node server.mjs
 ```
 
-The default port is 4317; `ATLAS_DATA_DIR` allows a different writable cache and settings folder. Process environment variables apply only to the corresponding launch; for persistent startup configuration, they must be available in the Windows user environment.
+On Linux:
 
-```powershell
+```sh
+ATLAS_PORT=4318 ATLAS_DATA_DIR="$HOME/atlas-data" node server.mjs
+```
+
+The default port is 4317; `ATLAS_DATA_DIR` allows a different writable cache and settings folder. Process environment variables apply only to the corresponding launch; for persistent Windows startup configuration, they must be available in the Windows user environment.
+
+On Linux, set `ATLAS_PORT`, `ATLAS_DATA_DIR`, `CLAUDE_CONFIG_DIR`, and `CODEX_HOME` in the desktop session environment if the autostarted app should use non-default values. A terminal-only export is not available to the next login's desktop session.
+
+```text
 npm test
 ```
 

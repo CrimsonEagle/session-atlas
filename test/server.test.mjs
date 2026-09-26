@@ -28,6 +28,7 @@ test('HTTP API is local, rejects foreign origins/mutations, validates settings a
  assert.equal(foreignHostStatus,403);
  assert.equal((await fetch(base+'/api/settings',{method:'POST',body:'{}'})).status,403);
  const bootstrap=await(await fetch(base+'/api/bootstrap')).json();const post=(endpoint,x)=>fetch(base+endpoint,{method:'POST',headers:{'Content-Type':'application/json','X-Atlas-Token':bootstrap.token},body:JSON.stringify(x)});
+ assert.equal(bootstrap.platform,process.platform);
  assert.deepEqual(bootstrap.settings.hiddenProviders,[]);
  assert.equal((await post('/api/settings',{...bootstrap.settings,intervalSeconds:1})).status,400);
  assert.equal((await post('/api/settings',{...bootstrap.settings,claudeRoots:['relative/path']})).status,400);

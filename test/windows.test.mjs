@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {setStartup,startupStatus,powershell,psQuote} from '../lib/windows.mjs';
+import {setStartup,startupStatus,powershell,psQuote} from '../lib/platform.mjs';
 test('Autostart shortcut round-trip in an isolated fake APPDATA directory', {skip:process.platform!=='win32'},async()=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'session-atlas-startup-')),old=process.env.APPDATA;
  try {

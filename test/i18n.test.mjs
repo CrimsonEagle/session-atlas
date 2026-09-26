@@ -27,6 +27,8 @@ test('translation covers static labels and dynamic usage sentences',()=>{
  assert.equal(translateGerman('3 Antworten ohne bekannten Preis'),'3 responses without a known price');
  assert.equal(translateGerman('Woche ab Donnerstag, 10. September 2026'),'Week of Thursday, 10. September 2026');
  assert.equal(translateGerman('Tokens'),'Tokens');
+ assert.equal(translateGerman('Linux-Autostart'),'Linux startup');
+ assert.equal(translateGerman('App beendet. Zum Starten sh Start.sh ausführen.'),'App stopped. Run sh Start.sh to start it again.');
 });
 
 test('translation covers dynamic dialog copy without mixed-language fragments',()=>{

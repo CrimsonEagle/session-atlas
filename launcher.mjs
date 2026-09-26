@@ -2,7 +2,7 @@ import {spawn} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {openBrowser} from './lib/windows.mjs';
+import {openBrowser} from './lib/platform.mjs';
 import {runtimeRevision} from './lib/runtime-revision.mjs';
 const root=path.dirname(fileURLToPath(import.meta.url));
 const url=`http://127.0.0.1:${Number(process.env.ATLAS_PORT||4317)}`;
