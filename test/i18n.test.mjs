@@ -32,10 +32,13 @@ test('translation covers static labels and dynamic usage sentences',()=>{
 test('translation covers dynamic dialog copy without mixed-language fragments',()=>{
  assert.equal(translateGerman('Tag · 29 Abschnitte'),'Day · 29 periods');
  assert.equal(
-  translateGerman('Geschätzter API-Gegenwert des nutzbaren Kontingents: Jede Rohmessung wird auf 100 % hochgerechnet; dargestellt wird anschließend genau ein arithmetischer Mittelwert je gemeldetem 5-Stunden- oder 7-Tage-Fenster.'),
-  'Estimated API value of the usable quota: Each raw measurement is extrapolated to 100%; exactly one arithmetic mean is then shown for each reported five-hour or seven-day window.'
+  translateGerman('Geschätzter API-Gegenwert des nutzbaren Kontingents: Jeder Punkt zeigt den arithmetischen Mittelwert der auf 100 % hochgerechneten Messungen eines gemeldeten 5-Stunden- oder 7-Tage-Fensters.'),
+  'Estimated API value of the usable quota: Each dot shows the arithmetic mean of measurements extrapolated to 100% for a reported five-hour or seven-day window.'
  );
+ assert.equal(translateGerman('Punkte zeigen je Resetfenster den arithmetischen Mittelwert. Linien und Hüllkurven zeigen denselben robusten Trend aus Einzelmessungen wie in der Einzelansicht. Geringe Usage und fehlende Modellpreise zählen weniger; die Hüllkurve zeigt nur die angenommene Rundungsspanne.'),'Dots show the arithmetic mean for each reset window. Lines and envelopes show the same robust trend from individual measurements as in the individual view. Low usage and missing model prices receive less weight; the envelope shows only the assumed rounding range.');
  assert.equal(translateGerman('3 Fenstermittel enthalten Messpunkte mit unbekannten Modellpreisen.'),'3 window averages contain measurements with unknown model prices.');
+ assert.equal(translateGerman('Rundungsbereich $6.67 – $20.00'),'Rounding range $6.67 – $20.00');
+ assert.equal(translateGerman('Messpunkt-Spannweite'),'Measurement spread');
  assert.equal(translateGerman('1 Modellnamen · 925 Antworten ohne Preis'),'1 model name · 925 responses without pricing');
  assert.equal(translateGerman('4 von 8 Fenstermitteln der eingeblendeten Zeitfenster · 12 Messpunkte insgesamt. Die Hochrechnung ist eine lokale Näherung aus API-Preisen, keine Auskunft des Anbieters über ein Geldlimit.'),'4 of 8 window averages across the displayed time windows · 12 measurements in total. The extrapolation is a local approximation based on API prices, not a provider statement about a monetary limit.');
  assert.equal(translateGerman('🇩🇪 Deutsch'),'🇩🇪 German');
