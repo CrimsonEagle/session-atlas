@@ -120,6 +120,13 @@ test('The bridge stores only the rate limit block and never fails loudly',async 
  assert.equal((await runBridge([],JSON.stringify({model:{display_name:'Opus 5'}}),{ATLAS_RATE_LIMIT_FILE:other})).code,0);
  assert.equal(await fs.access(other).then(()=>true,()=>false),false);
 });
+test('Bridge and Atlas share a custom Claude configuration directory',async t=>{
+ const dir=await fixture(t),roots=[path.join(dir,'projects')];
+ const {code}=await runBridge(['--quiet'],JSON.stringify({rate_limits:statusline}),{CLAUDE_CONFIG_DIR:dir,ATLAS_RATE_LIMIT_FILE:'',ATLAS_RATE_LIMIT_INBOX:''});
+ assert.equal(code,0);
+ assert.equal((await readLimits(roots)).source,'statusline');
+ assert.equal((await readLimitInbox(roots)).length,1);
+});
 test('The bridge queues changed measurements without accumulating unchanged renders',async t=>{
  const dir=await fixture(t),file=path.join(dir,BRIDGE_FILE),inbox=path.join(dir,INBOX_DIR),payload=JSON.stringify({rate_limits:statusline});
  await runBridge(['--quiet'],payload,{ATLAS_RATE_LIMIT_FILE:file});

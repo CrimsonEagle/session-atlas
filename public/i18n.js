@@ -464,6 +464,7 @@ Object.assign(phrases,{
  'KI-Tool':'AI tool','KI-Tools':'AI tools','Kennzahlen':'Metrics','Modelle anzeigen':'Show models','Diagramm-Metrik':'Chart metric',
  'Eigene Preise lassen sich in den':'Custom prices can be added in',' ergänzen.':'.','ergänzen.':'.','Vorherige Seite':'Previous page','Nächste Seite':'Next page',
  'aufsteigend':'ascending','absteigend':'descending','Aktualisiert':'Updated','Sichtbare Provider':'Visible providers','anzeigen':'show','Stände':'snapshots',
+ 'API mit Snapshot und Übertragung':'API including snapshot and transfer','Lese-/Cachefehler':'read/cache errors',
  'Mit ':'Create a ZIP with ',' ein ZIP ohne persönliche Daten erstellen. Node.js 22.13+ ist erforderlich.':' without personal data. Node.js 22.13+ is required.',
  'Lokale Logordner für deine KI-Tools.':'Local log folders for your AI tools.',
  'Sichtbare KI-Tools':'Visible AI tools',

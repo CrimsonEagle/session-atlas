@@ -6,12 +6,25 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 import {Store} from '../lib/store.mjs';
+import {PriceHistory} from '../lib/price-history.mjs';
 async function fixture(t){const dir=await fs.mkdtemp(path.join(os.tmpdir(),'session-atlas-test-'));t.after(async()=>{if(path.dirname(dir)!==os.tmpdir()||!path.basename(dir).startsWith('session-atlas-test-'))throw Error('Unexpected cleanup path');await fs.rm(dir,{recursive:true,force:true});});const logs=path.join(dir,'logs');await fs.mkdir(logs);return {dir,logs,settings:{claudeRoots:[logs],codexRoots:[],prices:{}}};}
 const line=(id,output=10)=>JSON.stringify({type:'assistant',timestamp:'2026-09-11T10:00:00Z',sessionId:'session',cwd:'C:/example',message:{id,model:'claude-sonnet-4-6',usage:{input_tokens:100,output_tokens:output},content:[{type:'text',text:'PRIVATE CONTENT SHOULD NEVER BE CACHED'}]}})+'\n';
 const codexLine=value=>JSON.stringify(value)+'\n';
 const codexMeta=(id='thread')=>codexLine({type:'session_meta',timestamp:'2026-09-11T10:00:00Z',payload:{id,timestamp:'2026-09-11T10:00:00Z',cwd:'C:/example'}});
 const codexCumulative=(input=100)=>codexLine({type:'event_msg',timestamp:'2026-09-11T10:01:00Z',payload:{type:'token_count',info:{last_token_usage:{input_tokens:input,output_tokens:10},total_token_usage:{input_tokens:input,output_tokens:10}}}});
 const codexRecord=(id='thread',response='response',input=100)=>codexLine({type:'token_usage_record',timestamp:'2026-09-11T10:01:00Z',payload:{thread_id:id,response_id:response,usage:{input_tokens:input,output_tokens:10}}});
+test('refresh pricing reuses one rate table without freezing manual or historical prices',async t=>{
+ const {dir,logs,settings}=await fixture(t),model='claude-sonnet-4-6',history=new PriceHistory(path.join(dir,'prices.json'));
+ await history.capture({overrides:{[model]:[4,.4,8]},validFrom:'2026-09-10T00:00:00Z'});
+ await fs.writeFile(path.join(logs,'prices.jsonl'),line('one')+line('two'));
+ const store=new Store(path.join(dir,'cache.json'),history),current={...settings,pricingMode:'current',prices:{[model]:[1,.1,2]}};
+ let snapshot=await store.scan(current);
+ assert.deepEqual(snapshot.sessions[0].events.map(event=>event.cost),[.00012,.00012]);
+ snapshot=store.snapshot({...current,prices:{[model]:[2,.2,4]}});
+ assert.deepEqual(snapshot.sessions[0].events.map(event=>event.cost),[.00024,.00024]);
+ snapshot=store.snapshot({...current,pricingMode:'historical'});
+ assert.deepEqual(snapshot.sessions[0].events.map(event=>event.cost),[.00048,.00048]);
+});
 test('Codex state names are merged into snapshots and persisted',async t=>{
  const home=await fs.mkdtemp(path.join(os.tmpdir(),'session-atlas-codex-name-')),logs=path.join(home,'sessions'),cache=path.join(home,'cache.json');
  t.after(async()=>fs.rm(home,{recursive:true,force:true}));await fs.mkdir(logs);await fs.writeFile(path.join(logs,'thread.jsonl'),codexMeta('thread')+codexCumulative());

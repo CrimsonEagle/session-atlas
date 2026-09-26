@@ -25,6 +25,7 @@ test('translation covers static labels and dynamic usage sentences',()=>{
  assert.equal(translateGerman('Übersicht'),'Overview');
  assert.equal(translateGerman('Letzte 30 Tage'),'Last 30 days');
  assert.equal(translateGerman('3 Antworten ohne bekannten Preis'),'3 responses without a known price');
+ assert.equal(translateGerman('Gesamt 120 ms · Scan 25 ms'),'Total 120 ms · Scan 25 ms');
  assert.equal(translateGerman('Woche ab Donnerstag, 10. September 2026'),'Week of Thursday, 10. September 2026');
  assert.equal(translateGerman('Tokens'),'Tokens');
  assert.equal(translateGerman('Linux-Autostart'),'Linux startup');

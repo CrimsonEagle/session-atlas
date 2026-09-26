@@ -76,8 +76,16 @@ Git repositories are detected from their `.git` metadata, and worktrees are asso
 Claude Code writes `cachedUsageUtilization` only when it retrieves the values itself, not after every response. A measurement may therefore be several days old. The included bridge hooks into the documented status-line interface, refreshes the current snapshot on every render, and queues every changed measurement until Session Atlas has durably imported it. Session Atlas therefore does not need to be running while Claude Code is active. Add the following to the **Claude Code** `settings.json`:
 
 ```json
-"statusLine": { "command": "node \"C:\\Path\\to\\Session-Atlas\\bridge\\atlas-statusline.mjs\"" }
+"statusLine": { "type": "command", "command": "node \"C:\\Path\\to\\Session-Atlas\\bridge\\atlas-statusline.mjs\"" }
 ```
+
+On Linux, use the absolute path to the extracted app instead:
+
+```json
+"statusLine": { "type": "command", "command": "node '/home/you/Session-Atlas/bridge/atlas-statusline.mjs'" }
+```
+
+Claude Code 2.1.251+ supplies the five-hour and seven-day percentages for claude.ai Pro and Max subscriptions after the first API response. If `rate_limits` or a window is absent, Atlas cannot record a new measurement for it.
 
 If you already use a status line, place the existing command after the bridge. The bridge forwards the input unchanged and leaves output generation to that command:
 

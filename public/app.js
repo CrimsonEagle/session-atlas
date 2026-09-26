@@ -37,7 +37,7 @@ document.documentElement.dataset.palette=palette;
 const background=createBackground({document,window});
 function backgroundVariantsMarkup(){return `<div class="background-variants" role="group" aria-label="Hintergrundmotiv">${BACKGROUND_VARIANTS.map(value=>{const detail=BACKGROUND_VARIANT_DETAILS[value];return `<button type="button" class="background-variant ${background.variant===value?'active':''}" data-background-choice="${value}" aria-pressed="${background.variant===value}"><span class="background-preview background-preview-${value}" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="background-variant-copy"><strong>${detail.name}</strong></span><span class="background-variant-check" aria-hidden="true">✓</span></button>`;}).join('')}</div>`;}
 const savedLimitHistory=readLimitHistoryPreferences();
-let data=null,config=null,token='',busy=false,view='overview',page=0,group='sessions',sort='activity',sortDirection='desc',chartMetric='tokens',chartPeriod='day',selectedChartBucket=null,overviewVisual='chart',calendarMetric='tokens',calendarRangeMode='selection',comparisonEnabled=false,comparisonMetric='tokens',comparisonDimension='repository',comparisonSort='delta',comparisonSortDirection='desc',limitHistoryTool='',limitHistoryMode='cost',limitHistoryAggregation=savedLimitHistory.aggregation,limitHistorySort='observed',limitHistorySortDirection='desc',limitHistoryPeriod=savedLimitHistory.period,limitHistoryFrom=savedLimitHistory.from||day(Date.now()-29*86400000),limitHistoryTo=savedLimitHistory.to||day(Date.now()),limitHistoryVisibleWindows=new Set([300,10080]),expandedTasks=new Set(),expandedSessions=new Set(),unknownPriceSort='requests',unknownPriceSortDirection='desc',toastTimer,priceSyncBusy=false,priceSyncMessage='',detailViews,restorePreviewId='';
+let data=null,config=null,token='',busy=false,view='overview',page=0,group='sessions',sort='activity',sortDirection='desc',chartMetric='tokens',chartPeriod='day',selectedChartBucket=null,overviewVisual='chart',calendarMetric='tokens',calendarRangeMode='selection',comparisonEnabled=false,comparisonMetric='tokens',comparisonDimension='repository',comparisonSort='delta',comparisonSortDirection='desc',limitHistoryTool='',limitHistoryMode='cost',limitHistoryAggregation=savedLimitHistory.aggregation,limitHistorySort='observed',limitHistorySortDirection='desc',limitHistoryPeriod=savedLimitHistory.period,limitHistoryFrom=savedLimitHistory.from||day(Date.now()-29*86400000),limitHistoryTo=savedLimitHistory.to||day(Date.now()),limitHistoryVisibleWindows=new Set([300,10080]),expandedTasks=new Set(),expandedSessions=new Set(),unknownPriceSort='requests',unknownPriceSortDirection='desc',toastTimer,priceSyncBusy=false,priceSyncMessage='',detailViews,restorePreviewId='',lastRefreshTimings=null;
 const limitHistoryCache=new Map(),sessionDetailCache=new Map();
 const pageSize=12;
 const titles={overview:'Übersicht',sessions:'Sessions',repositories:'Repositories',models:'Modelle',settings:'Einstellungen'};
@@ -49,7 +49,23 @@ function active(){return document.visibilityState==='visible'&&document.hasFocus
 function live(){const el=$('#live-status');const on=active();el.classList.toggle('paused',!on);el.textContent=busy?'Wird aktualisiert …':on?`Live · ${config?.settings.intervalSeconds||30} s`:'Im Hintergrund pausiert';}
 const polling=createPolling({isActive:()=>active()&&!!config,delay:()=>config.settings.intervalSeconds*1000,refresh:()=>refresh(false),onState:live});
 function schedule(){polling.schedule();}
-async function refresh(manual=true){if(busy||(!manual&&!active())||!config)return;busy=true;$('#refresh').disabled=true;live();try{data=await api('/api/refresh',{});limitHistoryCache.clear();error((data.stats?.warnings||[]).filter(w=>w.startsWith('Hermes')).join(' · '));updateFilters();render();detailViews?.dataChanged();const tools=activeTools(),alerts=(data.limitAlerts||[]).filter(alert=>tools.includes(alert.tool));if(alerts.length)toast(alerts.map(alert=>`${toolName(alert.tool)} · ${alert.windowMinutes===300?'5 Stunden':'Wöchentlich'} bei ${alert.usedPercent.toLocaleString(activeLocale())} %`).join(' · '));else if(manual)toast('Session-Daten sind aktuell.');}catch(e){error(`Aktualisierung fehlgeschlagen: ${e.message}`);}finally{busy=false;$('#refresh').disabled=false;schedule();}}
+async function refresh(manual=true){
+ if(busy||(!manual&&!active())||!config)return;
+ const started=performance.now();let requestMs=0,uiMs=0,completed=false;
+ busy=true;$('#refresh').disabled=true;live();
+ try{
+  const requestStarted=performance.now();data=await api('/api/refresh',{});requestMs=performance.now()-requestStarted;
+  const uiStarted=performance.now();limitHistoryCache.clear();error((data.stats?.warnings||[]).filter(w=>w.startsWith('Hermes')).join(' · '));updateFilters();render();detailViews?.dataChanged();
+  const tools=activeTools(),alerts=(data.limitAlerts||[]).filter(alert=>tools.includes(alert.tool));
+  if(alerts.length)toast(alerts.map(alert=>`${toolName(alert.tool)} · ${alert.windowMinutes===300?'5 Stunden':'Wöchentlich'} bei ${alert.usedPercent.toLocaleString(activeLocale())} %`).join(' · '));else if(manual)toast('Session-Daten sind aktuell.');
+  uiMs=performance.now()-uiStarted;completed=true;
+ }catch(e){error(`Aktualisierung fehlgeschlagen: ${e.message}`);}
+ finally{
+  busy=false;$('#refresh').disabled=false;
+  if(completed){lastRefreshTimings={total:Math.round(performance.now()-started),request:Math.round(requestMs),ui:Math.round(uiMs)};updateScanStatus();}
+  schedule();
+ }
+}
 document.addEventListener('visibilitychange',polling.visibilityChanged);window.addEventListener('focus',polling.visibilityChanged);window.addEventListener('blur',polling.pause);
 function bounds(){return rangeForPeriod($('#period').value,{from:$('#from').value,to:$('#to').value});}
 function filterScope(){return {bounds:bounds(),tool:$('#tool').value,repository:$('#repository').value,model:$('#model').value,query:$('#search').value.trim().toLowerCase()};}
@@ -168,6 +184,12 @@ function mountProviderSettings(){
  const saveNote=$('.settings-savebar span');if(saveNote)saveNote.textContent='KI-Tools, Pfade, Intervall, Preise und Limits werden gemeinsam übernommen.';
 }
 function providerEmpty(){return `<section class="panel empty"><span aria-hidden="true">◫</span><h2>Keine KI-Tools aktiv</h2><p>Aktiviere eine Quelle in den Einstellungen, um Nutzungsdaten anzuzeigen.</p><a class="button" href="#settings">Datenquellen öffnen</a></section>`;}
+function updateScanStatus(){
+ const status=$('#scan-status'),st=data?.stats,elapsed=lastRefreshTimings;
+ status.textContent=data?.lastScan?`Aktualisiert ${date(data.lastScan)} · ${st?.files||0} Dateien · ${st?.changed||0} geändert · ${elapsed?`Gesamt ${elapsed.total} ms · `:''}Scan ${st?.durationMs||0} ms`:'Bereit · noch kein Scan';
+ if(st?.warnings?.length)status.textContent+=` · ${st.warnings.length} Lese-/Cachefehler`;
+ status.title=[elapsed?`API mit Snapshot und Übertragung: ${elapsed.request} ms · UI: ${elapsed.ui} ms`:'',...(st?.warnings||[])].filter(Boolean).join('\n');
+}
 function render(){if(!data&&view!=='settings')return;const title=titles[view],tools=activeTools();$('#page-title').textContent=title;$('#breadcrumb').textContent=title;document.querySelectorAll('[data-view]').forEach(a=>{a.classList.toggle('active',a.dataset.view===view);if(a.dataset.view===view)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});$('#filters').hidden=view==='settings'||!tools.length;$('#export').hidden=view==='settings'||!tools.length;$('#shutdown-overview').hidden=view!=='overview';
  $('#compare-toggle').hidden=view!=='overview';$('#compare-controls').hidden=view!=='overview'||!comparisonEnabled;$('#compare-toggle').classList.toggle('active',comparisonEnabled);$('#compare-toggle').setAttribute('aria-pressed',String(comparisonEnabled));
  if(view==='settings'){// Preserve unsaved edits during background refreshes.
@@ -175,8 +197,7 @@ function render(){if(!data&&view!=='settings')return;const title=titles[view],to
  }else if(!tools.length){$('#content').innerHTML=providerEmpty();chartSessions=null;
  }else{const sessions=filtered();const unknown=totals(sessions.flatMap(s=>s.events)).unknown;const usageMarkup=view==='overview'?(overviewVisual==='calendar'?calendar(sessions):chart(sessions)):'',limitMarkup=view==='overview'?limits():'',selected=scopedSessions();const selection=view==='overview'&&selectedChartBucket?`<div class="chart-selection" role="status"><span>Daten darunter gefiltert auf <strong>${esc(bucketLabel(selectedChartBucket,chartPeriod,activeLocale()))}</strong></span><button id="clear-chart-selection" type="button">${overviewVisual==='calendar'?'Tagesauswahl aufheben':'Alle Zeitabschnitte anzeigen'}</button></div>`:'';$('#content').innerHTML=metrics(sessions)+(unknown?`<div class="notice price-notice"><span>Für ${num(unknown)} Modellantworten fehlt ein verlässlicher Preis. Bekannte Kosten sind Untergrenzen und können höher ausfallen; zusätzlich ist die Summe unvollständig. Eigene Preise lassen sich in den <a href="#settings"><u>Einstellungen</u></a> ergänzen.</span><button class="notice-action" id="price-details">Modelle anzeigen</button></div>`:'')+comparisonMarkup(sessions)+(view==='overview'?`<div class="dashboard-grid ${overviewVisual==='calendar'?'calendar-layout':''} ${limitMarkup?'':'without-limits'}">${usageMarkup}${limitMarkup}</div>`:'')+selection+table(selected)+(view==='overview'&&selected.length?insights(selected):'');chartSessions=view==='overview'&&overviewVisual==='chart'?sessions:null;if(chartSessions)fitChart();}
  updateFilterReset();
- const st=data?.stats;$('#scan-status').textContent=data?.lastScan?`Aktualisiert ${date(data.lastScan)} · ${st?.files||0} Dateien · ${st?.changed||0} geändert · ${st?.durationMs||0} ms`:'Bereit · noch kein Scan';
- if(st?.warnings?.length){$('#scan-status').textContent+=` · ${st.warnings.length} Lese-/Cachefehler`;$('#scan-status').title=st.warnings.join('\n');}
+ updateScanStatus();
 }
 function navigate(){view=location.hash.slice(1) in titles?location.hash.slice(1):'overview';page=0;group=view==='repositories'?'repository':'sessions';sort='activity';sortDirection='desc';selectedChartBucket=null;$('#content').innerHTML='';render();}
 window.addEventListener('hashchange',navigate);
