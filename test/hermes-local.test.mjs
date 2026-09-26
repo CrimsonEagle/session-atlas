@@ -69,6 +69,31 @@ test('local Hermes scans preserve deltas and use OpenRouter fallback for unknown
  assert.equal(restored.snapshot(settings).sessions[0].events.length,4);
 });
 
+test('subscription-included Hermes usage has an API-equivalent cost and repairs cached zeroes',async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'atlas-hermes-included-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+ const root=path.join(dir,'hermes');await fs.mkdir(root);const file=path.join(root,'state.db');database(file,{models:false});
+ const db=new DatabaseSync(file);
+ db.exec("UPDATE sessions SET model='gpt-5.6-terra', billing_provider='openai-codex', billing_base_url='https://chatgpt.com/backend-api', billing_mode='subscription_included', cost_status='included', input_tokens=300000, cache_read_tokens=900000, output_tokens=20000, estimated_cost_usd=0, actual_cost_usd=0");db.close();
+ const settings={claudeRoots:[],codexRoots:[],hermesRoots:[root],prices:{}};
+ const cache=path.join(dir,'cache.json'),store=new Store(cache);
+ let session=(await store.scan(settings)).sessions[0];
+ assert.equal(session.events[0].cost,1.02);
+ assert.equal(session.events[0].pricingMode,'current');
+ const cached=JSON.parse(await fs.readFile(cache,'utf8'));
+ const state=Object.values(cached.hermesSources[root].sessions)[0];
+ for(const event of Object.values(state.events))event.reportedCost=0;
+ for(const usage of Object.values(state.lastUsages))usage.reportedCost=0;
+ await fs.writeFile(cache,JSON.stringify(cached));
+ const restarted=new Store(cache);await restarted.load();
+ assert.equal(restarted.snapshot(settings).sessions[0].events[0].cost,0);
+ session=(await restarted.scan(settings)).sessions[0];
+ assert.ok(session.events[0].cost>0);
+ assert.equal(session.events[0].pricingMode,'current');
+ const persisted=new Store(cache);await persisted.load();
+ assert.ok(persisted.snapshot(settings).sessions[0].events[0].cost>0);
+ assert.equal((await persisted.scan(settings)).sessions[0].events.length,1);
+});
+
 test('Hermes parent links do not imply a subagent',async t=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'atlas-hermes-relations-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
  const file=path.join(dir,'state.db');database(file,{models:false});
