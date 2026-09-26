@@ -4,6 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {randomBytes} from 'node:crypto';
+import {isIP} from 'node:net';
 import {Store} from './lib/store.mjs';
 import {effectiveRates} from './lib/pricing.mjs';
 import {loadPriceCache,remotePrices,priceSyncStatus,syncPrices} from './lib/price-sync.mjs';
@@ -20,7 +21,9 @@ const dataRoot=process.env.ATLAS_DATA_DIR||path.join(root,'.local');
 let active=await activeState(dataRoot),dataDir=active.dir;
 await loadPriceCache(dataDir);
 const port=Number(process.env.ATLAS_PORT||4317);
-const origin=`http://127.0.0.1:${port}`;
+const bindHost=process.env.ATLAS_HOST||'127.0.0.1';
+if(isIP(bindHost)!==4||bindHost==='0.0.0.0')throw Error('ATLAS_HOST muss eine konkrete IPv4-Adresse sein.');
+const origin=`http://${bindHost}:${port}`;
 const token=randomBytes(32).toString('hex');
 const defaultThresholds={codex:{300:[80,95],10080:[80,95]},claude:{300:[80,95],10080:[80,95]}};
 const defaults={intervalSeconds:30,hiddenProviders:[],limitRetentionDays:90,limitThresholds:defaultThresholds,claudeRoots:[path.join(process.env.CLAUDE_CONFIG_DIR||path.join(os.homedir(),'.claude'),'projects')],codexRoots:[path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'sessions'),path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'archived_sessions')],prices:{},pricingMode:'current',priceEffectiveFrom:''};
@@ -62,8 +65,9 @@ const server=http.createServer(async(req,res)=>{
  res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
  const json=(status,value)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(value));};
  try {
-  if(req.headers.host!==`127.0.0.1:${port}`&&req.headers.host!==`localhost:${port}`)return json(403,{error:'Ungültiger Host.'});
-  if(req.headers.origin&&!([origin,`http://localhost:${port}`].includes(req.headers.origin)))return json(403,{error:'Fremder Ursprung blockiert.'});
+  const allowedOrigins=bindHost==='127.0.0.1'?[origin,`http://localhost:${port}`]:[origin];
+  if(!allowedOrigins.some(value=>req.headers.host===new URL(value).host))return json(403,{error:'Ungültiger Host.'});
+  if(req.headers.origin&&!allowedOrigins.includes(req.headers.origin))return json(403,{error:'Fremder Ursprung blockiert.'});
   if(req.headers['sec-fetch-site']==='cross-site')return json(403,{error:'Fremder Ursprung blockiert.'});
   const url=new URL(req.url,origin);
   if(req.method==='GET') {
@@ -142,4 +146,4 @@ const server=http.createServer(async(req,res)=>{
  }catch(e){console.error(e.message);if(!res.headersSent)json(e.statusCode||400,{error:e.message});else res.end();}
 });
 server.on('error',e=>{console.error(e.code==='EADDRINUSE'?`Port ${port} ist belegt. Starte über ${process.platform==='linux'?'sh Start.sh':'Start.cmd'} oder setze ATLAS_PORT.`:e.message);process.exitCode=1;});
-server.listen(port,'127.0.0.1',()=>{console.log(`Session Atlas: ${origin}`);if(process.argv.includes('--open'))openBrowser(origin).catch(e=>console.error(e.message));});
+server.listen(port,bindHost,()=>{console.log(`Session Atlas: ${origin}`);if(process.argv.includes('--open'))openBrowser(origin).catch(e=>console.error(e.message));});

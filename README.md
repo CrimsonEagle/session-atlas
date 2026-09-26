@@ -122,6 +122,7 @@ The startup entry points to the current folder and Node executable. After moving
 
 ```powershell
 $env:ATLAS_PORT = '4318'
+$env:ATLAS_HOST = '192.168.1.10'
 $env:ATLAS_DATA_DIR = 'C:\Path\to\Atlas-Data'
 node server.mjs
 ```
@@ -129,12 +130,12 @@ node server.mjs
 On Linux:
 
 ```sh
-ATLAS_PORT=4318 ATLAS_DATA_DIR="$HOME/atlas-data" node server.mjs
+ATLAS_PORT=4318 ATLAS_HOST=192.168.1.10 ATLAS_DATA_DIR="$HOME/atlas-data" node server.mjs
 ```
 
-The default port is 4317; `ATLAS_DATA_DIR` allows a different writable cache and settings folder. Process environment variables apply only to the corresponding launch; for persistent Windows startup configuration, they must be available in the Windows user environment.
+The default port is 4317; `ATLAS_DATA_DIR` allows a different writable cache and settings folder. By default the server binds to 127.0.0.1 only. `ATLAS_HOST` selects a different specific IPv4 address, for example the machine's LAN address, so that other devices on the trusted network can open the interface; the wildcard address 0.0.0.0 is not allowed. Every device that can reach that address can view analytics and change settings, so restrict access with the operating system firewall. Process environment variables apply only to the corresponding launch; for persistent Windows startup configuration, they must be available in the Windows user environment.
 
-On Linux, set `ATLAS_PORT`, `ATLAS_DATA_DIR`, `CLAUDE_CONFIG_DIR`, and `CODEX_HOME` in the desktop session environment if the autostarted app should use non-default values. A terminal-only export is not available to the next login's desktop session.
+On Linux, set `ATLAS_PORT`, `ATLAS_HOST`, `ATLAS_DATA_DIR`, `CLAUDE_CONFIG_DIR`, and `CODEX_HOME` in the desktop session environment if the autostarted app should use non-default values. A terminal-only export is not available to the next login's desktop session.
 
 ```text
 npm test

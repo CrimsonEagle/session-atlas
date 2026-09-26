@@ -46,3 +46,32 @@ test('HTTP API is local, rejects foreign origins/mutations, validates settings a
  assert.equal((await fetch(base+'/.local/settings.json')).status,404);
  assert.equal((await post('/api/shutdown',{})).status,200);await once(child,'exit');
 });
+
+test('explicit LAN address binds only that address and permits only its own host and origin',async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'session-atlas-lan-'));
+ const reserve=net.createServer();reserve.listen(0,'127.0.0.2');await once(reserve,'listening');const port=reserve.address().port;await new Promise(r=>reserve.close(r));
+ const child=spawn(process.execPath,['server.mjs'],{cwd:process.cwd(),env:{...process.env,ATLAS_PORT:String(port),ATLAS_HOST:'127.0.0.2',ATLAS_DATA_DIR:dir},stdio:['ignore','pipe','pipe']});
+ t.after(async()=>{if(child.exitCode===null){child.kill();await once(child,'exit');}await fs.rm(dir,{recursive:true,force:true});});
+ await once(child.stdout,'data');
+ const base=`http://127.0.0.2:${port}`;
+ assert.equal((await fetch(base+'/api/health')).status,200);
+ assert.equal((await fetch(base+'/api/snapshot',{headers:{Origin:base}})).status,200);
+ assert.equal((await fetch(base+'/api/snapshot',{headers:{Origin:'http://127.0.0.1:'+port}})).status,403);
+ const invalidHost=await new Promise((resolve,reject)=>http.get(base+'/api/health',{headers:{Host:'other.local:'+port}},res=>{res.resume();resolve(res.statusCode);}).on('error',reject));
+ assert.equal(invalidHost,403);
+ await assert.rejects(fetch(`http://127.0.0.1:${port}/api/health`));
+});
+
+test('launcher reuses an existing server at the configured address', {skip:process.platform!=='linux'},async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'session-atlas-launcher-'));
+ const reserve=net.createServer();reserve.listen(0,'127.0.0.2');await once(reserve,'listening');const port=reserve.address().port;await new Promise(r=>reserve.close(r));
+ const env={...process.env,ATLAS_PORT:String(port),ATLAS_HOST:'127.0.0.2',ATLAS_DATA_DIR:dir,PATH:`${dir}:${process.env.PATH}`};
+ const opener=path.join(dir,'xdg-open');await fs.writeFile(opener,'#!/bin/sh\nprintf "%s" "$1" > "$ATLAS_DATA_DIR/opened-url"\n',{mode:0o755});
+ const server=spawn(process.execPath,['server.mjs'],{cwd:process.cwd(),env,stdio:['ignore','pipe','pipe']});
+ t.after(async()=>{if(server.exitCode===null){server.kill();await once(server,'exit');}await fs.rm(dir,{recursive:true,force:true});});
+ await once(server.stdout,'data');
+ const launcher=spawn(process.execPath,['launcher.mjs'],{cwd:process.cwd(),env,stdio:['ignore','pipe','pipe']});
+ const [code]=await once(launcher,'exit');
+ assert.equal(code,0);
+ assert.equal(await fs.readFile(path.join(dir,'opened-url'),'utf8'),`http://127.0.0.2:${port}`);
+});
