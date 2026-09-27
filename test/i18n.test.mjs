@@ -24,12 +24,31 @@ test('language preference defaults to system and explicit choices persist',()=>{
 test('translation covers static labels and dynamic usage sentences',()=>{
  assert.equal(translateGerman('Übersicht'),'Overview');
  assert.equal(translateGerman('Letzte 30 Tage'),'Last 30 days');
+ assert.equal(translateGerman('Letzte 3 Monate'),'Last 3 months');
+ assert.equal(translateGerman('Eigen: 12.345'),'Own: 12.345');
+ assert.equal(translateGerman('Sortiert nach Gesamtsummen je Baumebene'),'Sorted by inclusive totals within each tree level');
  assert.equal(translateGerman('3 Antworten ohne bekannten Preis'),'3 responses without a known price');
  assert.equal(translateGerman('Gesamt 120 ms · Scan 25 ms'),'Total 120 ms · Scan 25 ms');
  assert.equal(translateGerman('Woche ab Donnerstag, 10. September 2026'),'Week of Thursday, 10. September 2026');
  assert.equal(translateGerman('Tokens'),'Tokens');
  assert.equal(translateGerman('Linux-Autostart'),'Linux startup');
  assert.equal(translateGerman('App beendet. Zum Starten sh Start.sh ausführen.'),'App stopped. Run sh Start.sh to start it again.');
+});
+
+test('overview separates subscription usage and recorded provider spending in English',()=>{
+ assert.equal(translateGerman('Sichtbare Provider'),'Visible providers');
+ assert.equal(translateGerman('KI-Tools steuern Nutzungsdaten, Diagramme und Filter. OpenRouter steuert nur seine Ausgaben-Kachel; gespeicherte Daten bleiben erhalten.'),'AI tools control usage data, charts, and filters. OpenRouter controls only its spending card; saved data remains available.');
+ assert.equal(translateGerman('API-Ausgaben'),'API spending');
+ assert.equal(translateGerman('Provider-Anzeigen, Pfade, Intervall, Preise und Limits werden gemeinsam übernommen.'),'Provider visibility, paths, interval, prices, and limits are saved together.');
+ assert.equal(translateGerman('Kontingente & Ausgaben'),'Quotas & spending');
+ assert.equal(translateGerman('Kontingente und Ausgaben'),'Quotas and spending');
+ assert.equal(translateGerman('Weitere Kontingente und Ausgaben'),'Additional quotas and spending');
+ assert.equal(translateGerman('Gemessene Abo-Auslastung und erfasste API-Ausgaben sind verschiedene Größen.'),'Measured subscription usage and recorded API spending are different quantities.');
+ assert.equal(translateGerman('Abrechnung per API-Anbieter'),'Billing by API provider');
+ assert.equal(translateGerman('Ausgaben ansehen'),'View spending');
+ assert.equal(translateGerman('gemeldet'),'reported');
+ assert.equal(translateGerman('Weitere Kontingente'),'More quotas');
+ assert.equal(translateGerman('Weitere API-Anbieter'),'More API providers');
 });
 
 test('translation covers dynamic dialog copy without mixed-language fragments',()=>{

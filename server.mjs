@@ -15,6 +15,7 @@ import {createBackup,parseBackup,MAX_BACKUP_COMPRESSED} from './lib/backup.mjs';
 import {staticAsset} from './lib/static-assets.mjs';
 import {runtimeRevision} from './lib/runtime-revision.mjs';
 import {defaultHermesHome,hermesRootId,validateHermesRoots} from './lib/hermes-local.mjs';
+import {collectorStatus,setCollectorEnabled} from './lib/hermes-collector-service.mjs';
 
 const root=path.dirname(fileURLToPath(import.meta.url));
 const revision=runtimeRevision(root);
@@ -26,7 +27,7 @@ const bindHost=process.env.ATLAS_HOST||'127.0.0.1';
 if(isIP(bindHost)!==4||bindHost==='0.0.0.0')throw Error('ATLAS_HOST muss eine konkrete IPv4-Adresse sein.');
 const origin=`http://${bindHost}:${port}`;
 const token=randomBytes(32).toString('hex');
-const defaultThresholds={codex:{300:[80,95],10080:[80,95]},claude:{300:[80,95],10080:[80,95]}};
+const defaultThresholds={codex:{300:[80,95],10080:[80,95]},claude:{300:[80,95],10080:[80,95]},hermes:{300:[80,95],10080:[80,95]}};
 const defaults={intervalSeconds:30,hiddenProviders:[],limitRetentionDays:90,limitThresholds:defaultThresholds,claudeRoots:[path.join(process.env.CLAUDE_CONFIG_DIR||path.join(os.homedir(),'.claude'),'projects')],codexRoots:[path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'sessions'),path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'archived_sessions')],hermesRoots:[defaultHermesHome()],prices:{},pricingMode:'current',priceEffectiveFrom:''};
 let settings={...defaults};
 try {settings={...defaults,...JSON.parse(await fs.readFile(path.join(dataDir,'settings.json'),'utf8'))};}catch{}
@@ -35,14 +36,14 @@ if(!priceHistory.snapshots.length)await priceHistory.capture({overrides:settings
 let store=new Store(path.join(dataDir,'usage-cache.json'),priceHistory);await store.load();
 function validateSettings(x) {
  if(!Number.isInteger(x.intervalSeconds)||x.intervalSeconds<10||x.intervalSeconds>3600)throw Error('Aktualisierung: 10 bis 3600 Sekunden.');
- if(!Array.isArray(x.hiddenProviders)||x.hiddenProviders.some(provider=>!['codex','claude','hermes'].includes(provider)))throw Error('Ungültige Provider-Sichtbarkeit.');
+ if(!Array.isArray(x.hiddenProviders)||x.hiddenProviders.some(provider=>!['codex','claude','hermes','openrouter'].includes(provider)))throw Error('Ungültige Provider-Sichtbarkeit.');
  for(const k of ['claudeRoots','codexRoots'])if(!Array.isArray(x[k])||x[k].length>20||x[k].some(p=>typeof p!=='string'||!path.isAbsolute(p)||p.length>2000))throw Error('Bitte gültige absolute Ordnerpfade eintragen.');
  if(!x.prices||typeof x.prices!=='object'||Array.isArray(x.prices))throw Error('Preise müssen ein JSON-Objekt sein.');
  for(const [model,r] of Object.entries(x.prices))if(model.length>120||!Array.isArray(r)||r.length<3||r.length>5||r.some(v=>!Number.isFinite(v)||v<0||v>100000))throw Error('Preise: je Modell 3 bis 5 nichtnegative Zahlen.');
  if(!Number.isInteger(x.limitRetentionDays)||x.limitRetentionDays<30||x.limitRetentionDays>3650)throw Error('Limitverlauf: 30 bis 3650 Tage Aufbewahrung.');
  if(!['current','historical'].includes(x.pricingMode))throw Error('Ungültiger Bewertungsmodus.');
  if(x.priceEffectiveFrom&& !Number.isFinite(Date.parse(x.priceEffectiveFrom)))throw Error('Ungültiger Gültigkeitsbeginn für manuelle Preise.');
- const limitThresholds={};for(const tool of ['codex','claude']){limitThresholds[tool]={};for(const minutes of [300,10080]){const values=x.limitThresholds?.[tool]?.[minutes];if(!Array.isArray(values)||values.length<1||values.length>5||values.some(value=>!Number.isFinite(value)||value<=0||value>100))throw Error('Limitschwellen: 1 bis 5 Prozentwerte zwischen 1 und 100.');limitThresholds[tool][minutes]=[...new Set(values)].sort((a,b)=>a-b);}}
+ const limitThresholds={};for(const tool of ['codex','claude','hermes']){limitThresholds[tool]={};for(const minutes of [300,10080]){const values=x.limitThresholds?.[tool]?.[minutes]||defaultThresholds[tool][minutes];if(!Array.isArray(values)||values.length<1||values.length>5||values.some(value=>!Number.isFinite(value)||value<=0||value>100))throw Error('Limitschwellen: 1 bis 5 Prozentwerte zwischen 1 und 100.');limitThresholds[tool][minutes]=[...new Set(values)].sort((a,b)=>a-b);}}
  return {intervalSeconds:x.intervalSeconds,hiddenProviders:[...new Set(x.hiddenProviders)],limitRetentionDays:x.limitRetentionDays,limitThresholds,claudeRoots:x.claudeRoots.map(p=>path.resolve(p)),codexRoots:x.codexRoots.map(p=>path.resolve(p)),hermesRoots:validateHermesRoots(x.hermesRoots),prices:x.prices,pricingMode:x.pricingMode,priceEffectiveFrom:x.priceEffectiveFrom?new Date(x.priceEffectiveFrom).toISOString():''};
 }
 let mutating=false;
@@ -82,10 +83,11 @@ const server=http.createServer(async(req,res)=>{
   const url=new URL(req.url,origin);
   if(req.method==='GET') {
    if(url.pathname==='/api/health')return json(200,{app:'session-atlas',version:'1.0.0',revision});
-   if(url.pathname==='/api/bootstrap')return json(200,{token,settings,platform:process.platform,startup:await startupStatus(),rates:effectiveRates(settings.prices),pricing:priceSyncStatus(),priceHistory:priceHistory.status(),dataDir:dataRoot,activeState:active.id,bridgeScript:path.join(root,'bridge','atlas-statusline.mjs')});
+   if(url.pathname==='/api/bootstrap')return json(200,{token,settings,platform:process.platform,startup:await startupStatus(),hermesCollector:await collectorStatus(),rates:effectiveRates(settings.prices),pricing:priceSyncStatus(),priceHistory:priceHistory.status(),dataDir:dataRoot,activeState:active.id,bridgeScript:path.join(root,'bridge','atlas-statusline.mjs')});
+   if(url.pathname==='/api/hermes-collector/status')return json(200,await collectorStatus());
    if(url.pathname==='/api/snapshot')return json(200,store.snapshot(settings,{compact:true}));
    if(url.pathname==='/api/limit-history'){
-    const tool=url.searchParams.get('tool');if(!['codex','claude'].includes(tool))return json(400,{error:'Ungültiges KI-Tool.'});
+    const tool=url.searchParams.get('tool');if(!['codex','claude','hermes'].includes(tool))return json(400,{error:'Ungültiges KI-Tool.'});
     return json(200,{tool,history:store.limitHistory.filter(point=>point.tool===tool),scanCount:store.scanCount});
    }
    if(url.pathname==='/api/session-details'){
@@ -107,6 +109,11 @@ const server=http.createServer(async(req,res)=>{
    }
    let body=(await readBody(req,64000)).toString('utf8');
    let input={};try {input=JSON.parse(body||'{}');}catch{return json(400,{error:'Ungültiges JSON.'});}
+   if(url.pathname==='/api/hermes-collector'){
+    if(typeof input.enabled!=='boolean'||Object.keys(input).length!==1)return json(400,{error:'Nur enabled als Boolean zulässig.'});
+    if(mutating)return json(409,{error:'Ein lokaler Datenstand wird gerade geändert.'});mutating=true;
+    try{const status=await setCollectorEnabled(input.enabled);if(input.enabled)await store.scan(settings,{compact:true});return json(200,status);}finally{mutating=false;}
+   }
    if(url.pathname==='/api/refresh'){if(mutating)return json(409,{error:'Ein lokaler Datenstand wird gerade geändert.'});const snapshot=await store.scan(settings,{compact:true});return json(200,{...snapshot,limitAlerts:store.takeLimitAlerts()});}
    if(url.pathname==='/api/cache/reset'){
     if(mutating)return json(409,{error:'Ein lokaler Datenstand wird gerade geändert.'});mutating=true;let previousCache;

@@ -65,6 +65,10 @@ export function axisLabel(key,period,locale='de-DE'){
  return period==='month'?date.toLocaleDateString(locale,{month:'short',year:'2-digit'}):date.toLocaleDateString(locale,{day:'2-digit',month:'short'});
 }
 
+export function overviewChartSize({width,height,paddingLeft=0,paddingRight=0,paddingTop=0,paddingBottom=0}){
+ return {width:Math.round(width-paddingLeft-paddingRight),height:Math.round(height-paddingTop-paddingBottom)};
+}
+
 // rows: [{key,...toolTotals}] with every period between first and last present, so the hover zones
 // tile the whole plot and an empty period reads as an explicit zero instead of a gap.
 export function seriesChart({rows,format,period='day',width=730,height=220,idPrefix='chart',title='',selectable=false,selectedKey=null,tools=['codex','claude'],locale='de-DE'}){

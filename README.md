@@ -15,7 +15,7 @@ The launcher starts the server in the background and opens **http://127.0.0.1:43
 
 - Token use, API-equivalent costs, session details, and timelines by day, week, or month; compare two periods and filter by tool, repository, model, or date.
 - An activity calendar, linked parent and subagent sessions, context timelines where logs provide them, and CSV exports of filtered usage events.
-- The latest recorded five-hour and weekly limit measurements for Claude Code and Codex, their history, reset boundaries, and configurable notifications.
+- The overview gives each visible usage-limit or explicit API billing provider (for example OpenRouter) its own card. Up to two cards sit beside the chart; any others appear as separate cards below it. Hiding a tool in Settings removes its entire limit card and its sessions from the billing data; hiding OpenRouter removes only its recorded-spending card without changing usage data or totals. The remaining cards fill the available positions. Five-hour and weekly usage bars remain visible without opening details; unavailable readings show **unknown**, not a zero-percent bar. Billing cards show locally recorded costs, not account credit or subscription limits, and their model breakdown respects the current date range and filters. Historical measurements, reset boundaries, and configurable notifications remain available.
 - Current or historically recorded model prices, with local pricing snapshots that can be compared for the same period.
 
 Closing the browser tab leaves the idle server running. Use **Exit App Completely** to stop it.
@@ -26,7 +26,9 @@ Closing the browser tab leaves the idle server running. Use **Exit App Completel
 | --- | --- |
 | **Data Sources** | Default local folders are scanned automatically. Add other absolute folders, including accessible UNC or WSL paths on Windows. `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, and `HERMES_HOME` change the respective default roots. |
 | **Automatic Scanning** | Defaults to 30 seconds; choose 10–3,600 seconds. Scanning pauses when the app is out of focus and refreshes when you return. You can also refresh manually. |
+| **Visible Providers** | Per provider: hiding an AI tool removes its usage data, chart series, filters, and limit card; hiding OpenRouter hides only its recorded-spending card while totals and usage data stay unchanged. Saved with the settings. |
 | **Limit Notifications** | Thresholds default to 80% and 95%, with at most one notification per threshold and reset window. Limit history is kept for 90 days by default. |
+| **Hermes Limits** | On Linux, install the separate user timer once (below), then start or stop it in **Settings → Limits**. Atlas itself needs no autostart. |
 | **Keep Claude Limits Current** | The optional status-line bridge below records updated Claude limit measurements. Without it, Atlas uses the latest values Claude Code has stored locally, which may be old. |
 | **Update Model Prices** | Update prices manually from LiteLLM, models.dev, and OpenRouter. No session data is sent. Manual prices take precedence; bundled prices remain a fallback. There is no background price download. |
 | **Backup & Restore** | Export a local `.json.gz` backup of app data and settings. Import validates and previews it, can remap missing source folders, and saves a recovery snapshot before restoration. Original logs and startup configuration are not included. Backups contain personal paths and session titles. |
@@ -61,6 +63,18 @@ Linux:
 ```
 
 If you already have a status-line command, put it after the bridge with `--` so it still receives the original input; `--quiet` runs the bridge without producing status-line output. The bridge stores only limit measurements. **Settings → Keep Claude Limits Current** shows its expected path and status. Measurements recorded by the bridge can be imported when Atlas next runs.
+
+### Hermes Codex subscription limit collector (Linux)
+
+With Hermes's OpenAI-Codex login available to your user, run this **once** from the Atlas folder (no sudo):
+
+```sh
+node scripts/install-hermes-collector.mjs
+```
+
+This installs two fixed `systemd --user` units and reloads the user manager; **it does not start or enable the timer**. In **Settings → Limits → Hermes-Limits sammeln**, press **Sammlung starten** to enable the five-minute timer and make the first measurement immediately. **Sammlung stoppen** disables it; history remains. No Atlas autostart is required: the timer operates separately while Atlas is closed. For unattended collection across logouts, enable systemd user lingering for your account (typically `loginctl enable-linger $USER`, which may need administrative permission). Re-run the installer if Atlas, Node, Hermes, or `HERMES_HOME` moves. Logs are under `journalctl --user -u session-atlas-hermes-usage.service`; the timer is `session-atlas-hermes-usage.timer`.
+
+The collector uses `hermes usage --provider openai-codex --json` and stores only the plan, two percentages, reset timestamps and measurement time under `$HERMES_HOME` (normally `~/.hermes`). **If nothing changes, it writes no measurement, snapshot, or inbox file**, and Atlas does not rewrite its limit cache. Errors never become zeroes. Each changed value is spooled until Atlas next scans, then imported into the normal limit history and backup. A repeated value after an intervening change counts as a new transition. Historic readings start with the first sample; they cannot be reconstructed from tokens. Values describe the **whole Codex subscription account**, including usage outside Hermes. Atlas shows the same historical API-equivalent cost-limit extrapolation as for Codex and Claude, using only locally recorded Hermes sessions routed through the Codex provider. OpenRouter and other Hermes costs are excluded. Activity elsewhere and approximate timestamps of cumulative Hermes usage counters can skew this comparison; it is not a provider-reported monetary limit or a subscription invoice. If the last poll fails, the timer is stopped, or the reset passes, the live card says unknown while history remains intact. The local Atlas UI is unauthenticated on LAN: any allowed LAN client can start or stop this timer.
 
 ### Server configuration
 

@@ -18,11 +18,23 @@ test('session tree starts collapsed and opening any level keeps descendant total
  assert.match(sessionRow(collapsed[0],helpers),/<strong>170<\/strong>/);
  const middle=sessionTreeRows(all,all,new Set([root.id]));
  assert.deepEqual(middle.map(row=>row.sessionId),['root','child','sibling']);
- assert.equal(middle[0].displayTotals.tokens,100);
+ assert.equal(middle[0].displayTotals.tokens,170);
+ assert.equal(middle[0].displayTotals.cost,.17);
  assert.equal(middle[1].displayTotals.tokens,50);
+ assert.equal(middle[0].ownTotals.tokens,100);
+ assert.equal(middle[1].ownTotals.tokens,40);
  const expanded=sessionTreeRows(all,all,new Set([root.id,child.id]));
  assert.deepEqual(expanded.map(row=>row.sessionId),['root','child','grandchild','sibling']);
+ assert.equal(expanded[0].displayTotals.tokens,170);
+ assert.equal(expanded[1].displayTotals.tokens,50);
+ assert.equal(expanded[0].displayTotals.cost,.17);
  assert.deepEqual(sessionTreeRows(all,all,new Set([root.id])).map(row=>row.sessionId),middle.map(row=>row.sessionId));
+ for(const row of [collapsed[0],middle[0],expanded[0]]){
+  const html=sessionRow(row,helpers);
+  assert.match(html,/<strong>170<\/strong><span class="row-subtitle">Eigen: 100<\/span>/);
+  assert.match(html,/<td class="numeric">0\.17<span class="row-subtitle">Eigen: 0\.1<\/span><\/td>/);
+  assert.match(html,/3 Sub-Sessions · Summe/);
+ }
 });
 
 test('filtered descendants retain a zero-value context parent and sum only selected usage',()=>{
@@ -33,14 +45,22 @@ test('filtered descendants retain a zero-value context parent and sum only selec
  assert.equal(rows[0].displayTotals.tokens,10);
  assert.equal(rows[0].displayTotals.cost,.01);
  assert.match(sessionRow(rows[0],helpers),/1 Sub-Session · Summe/);
+ assert.match(sessionRow(rows[0],helpers),/Eigen: –/);
 });
 
-test('token and cost sorting use each row’s visible own or inclusive value',()=>{
+test('token and cost sorting keep parent positions stable when children open',()=>{
  const first=session('first','',100),child=session('child','first',250),second=session('second','',180),all=[first,child,second];
  second.events[0].cost=.05;
  const ids=rows=>rows.map(row=>row.sessionId);
+ for(const sort of ['tokens','cost']){
+  for(const direction of ['asc','desc']){
+   const closed=ids(sessionTreeRows(all,all,new Set(),sort,direction));
+   const open=ids(sessionTreeRows(all,all,new Set([first.id]),sort,direction)).filter(id=>id!=='child');
+   assert.deepEqual(open,closed,`${sort} ${direction}`);
+  }
+ }
  assert.deepEqual(ids(sessionTreeRows(all,all,new Set(),'tokens','desc')),['first','second']);
- assert.deepEqual(ids(sessionTreeRows(all,all,new Set([first.id]),'tokens','desc')),['second','first','child']);
+ assert.deepEqual(ids(sessionTreeRows(all,all,new Set([first.id]),'tokens','desc')),['first','child','second']);
  assert.deepEqual(ids(sessionTreeRows(all,all,new Set([first.id]),'cost','desc')),['first','child','second']);
  assert.deepEqual(ids(sessionTreeRows(all,all,new Set(),'cost','asc')),['second','first']);
 });
@@ -50,7 +70,25 @@ test('nested siblings reorder when an intermediate session is collapsed',()=>{
  const ids=rows=>rows.map(row=>row.sessionId);
  assert.deepEqual(ids(sessionTreeRows(all,all,new Set(),'tokens','desc')),['root']);
  assert.deepEqual(ids(sessionTreeRows(all,all,new Set([root.id]),'tokens','desc')),['root','small','medium']);
- assert.deepEqual(ids(sessionTreeRows(all,all,new Set([root.id,small.id]),'tokens','desc')),['root','medium','small','grandchild']);
+ assert.deepEqual(ids(sessionTreeRows(all,all,new Set([root.id,small.id]),'tokens','desc')),['root','small','grandchild','medium']);
+});
+
+test('last activity sorts by newest descendant regardless of expansion and shows the parent time separately',()=>{
+ const first=session('first','',20),child=session('child','first',10),second=session('second','',40),all=[first,child,second];
+ first.lastActivity='2026-09-10T08:00:00Z';child.lastActivity='2026-09-20T09:00:00Z';second.lastActivity='2026-09-17T08:00:00Z';
+ const closed=sessionTreeRows(all,all,new Set(),'activity','desc');
+ const open=sessionTreeRows(all,all,new Set([first.id]),'activity','desc');
+ assert.deepEqual(closed.map(row=>row.sessionId),['first','second']);
+ assert.deepEqual(open.map(row=>row.sessionId),['first','child','second']);
+ assert.equal(open[0].displayActivity,child.lastActivity);
+ assert.match(sessionRow(open[0],helpers),/2026-09-20T09:00:00Z<span class="row-subtitle">Eigen: 2026-09-10T08:00:00Z<\/span>/);
+});
+
+test('secondary token count stays exact when the main family total is abbreviated',()=>{
+ const root=session('root','',12345),child=session('child','root',40000);
+ const row=sessionTreeRows([root,child],[root,child])[0];
+ const html=sessionRow(row,{...helpers,compact:n=>`${Math.round(n/1000)}T`,num:n=>new Intl.NumberFormat('de-DE').format(n)});
+ assert.match(html,/<strong>52T<\/strong><span class="row-subtitle">Eigen: 12\.345<\/span>/);
 });
 
 test('unassigned sessions join the same top-level numeric order',()=>{

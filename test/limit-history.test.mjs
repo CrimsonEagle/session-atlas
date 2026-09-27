@@ -40,6 +40,31 @@ test('history view separates reset windows and reports sources',()=>{
  const html=limitHistoryView({history,tool:'codex',now:now+2*60*60*1000,esc:String,date:String});assert.equal((html.match(/class="limit-history-area"/g)||[]).length,2);assert.equal((html.match(/class="limit-history-line"/g)||[]).length,2);assert.equal((html.match(/class="limit-history-point window-300"/g)||[]).length,4);assert.match(html,/data-tip=/);assert.doesNotMatch(html,/limit-history-hit/);assert.match(html,/class="limit-history-chart-wrap" data-tip-host/);assert.match(html,/viewBox="0 0 900 274"/);assert.match(html,/Flächen enden an Resetgrenzen/);assert.match(html,/Session-Log/);assert.match(html,/<option value="30" selected>/);
 });
 
+test('Hermes cost history extrapolates Codex-priced sessions like other tools',()=>{
+ const history=[
+  {id:'hermes-five',tool:'hermes',windowMinutes:300,resetsAt:'2026-09-15T15:00:00Z',usedPercent:36,sourceObservedAt:'2026-09-15T12:00:00Z',source:'hermes-usage'},
+  {id:'hermes-week',tool:'hermes',windowMinutes:10080,resetsAt:'2026-09-22T10:00:00Z',usedPercent:20,sourceObservedAt:'2026-09-15T12:00:00Z',source:'hermes-usage'}];
+ const sessions=[{tool:'hermes',events:[
+  {time:'2026-09-15T11:00:00Z',provider:'openai-codex',cost:1.8},
+  {time:'2026-09-15T11:30:00Z',provider:'openrouter',cost:9},
+  {time:'2026-09-15T11:45:00Z',provider:'openai-codex',cost:null}]}];
+ const [five,week]=estimateCostLimits(history,sessions,'hermes');
+ assert.equal(five.windowCost,1.8);assert.equal(five.estimatedLimit,5);
+ assert.equal(five.requests,2);assert.equal(five.unknownCosts,1);
+ assert.equal(week.windowCost,1.8);assert.equal(week.estimatedLimit,9);
+ const html=limitHistoryView({history,sessions,tool:'hermes',mode:'cost',period:'all',now,esc:String,date:String,money:value=>`$${value.toFixed(2)}`});
+ assert.match(html,/data-limit-history-mode="cost"[^>]*aria-pressed="true"/);
+ assert.doesNotMatch(html,/data-limit-history-mode="cost"[^>]*disabled/);
+ assert.match(html,/<option value="raw" selected>Einzelmessungen<\/option>/);
+ assert.match(html,/class="limit-cost-kpis"/);
+ assert.match(html,/\$5\.00/);assert.match(html,/\$9\.00/);
+ assert.match(html,/gesamte Codex-Konto/);
+ assert.match(html,/Hermes.*Codex/);
+ assert.match(html,/Geschätzter API-Gegenwert/);
+ const usage=limitHistoryView({history,sessions,tool:'hermes',mode:'usage',period:'all',now,esc:String,date:String});
+ assert.match(usage,/Hermes-Usage-API/);assert.match(usage,/Gemessener Limitverlauf/);
+});
+
 test('interactive limit legend filters usage chart and table together',()=>{
  const history=[
   {id:'five-1',tool:'codex',windowMinutes:300,resetsAt:'2026-09-15T15:00:00Z',usedPercent:20,sourceObservedAt:'2026-09-15T10:00:00Z',source:'session-log'},

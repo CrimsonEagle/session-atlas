@@ -18,6 +18,10 @@ export function rangeForPeriod(period='30',{now=Date.now(),from='',to=''}={}) {
  const current=new Date(now);let start=0,end=current.getTime();
  if(period==='today')start=localMidnight(current).getTime();
  else if(['7','30'].includes(String(period))){const date=localMidnight(current);date.setDate(date.getDate()-Number(period)+1);start=date.getTime();}
+ else if(period==='3months'){
+  const date=localMidnight(current),day=date.getDate();date.setDate(1);date.setMonth(date.getMonth()-3);
+  const lastDay=new Date(date.getFullYear(),date.getMonth()+1,0).getDate();date.setDate(Math.min(day,lastDay)+1);start=date.getTime();
+ }
  else if(period==='12months'){const date=localMidnight(current);date.setFullYear(date.getFullYear()-1);date.setDate(date.getDate()+1);start=date.getTime();}
  else if(period==='week')start=startOfWeek(current).getTime();
  else if(period==='month')start=startOfMonth(current).getTime();

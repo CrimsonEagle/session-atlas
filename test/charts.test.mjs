@@ -6,6 +6,7 @@ import {
  bucketLabel,
  compareValues,
  nextSort,
+ overviewChartSize,
  seriesChart,
  sortableHeader,
  sortRows,
@@ -34,6 +35,14 @@ function tooltipFixture(){
 const rows=[{key:'2026-09-10',codex:10,claude:0},{key:'2026-09-11',codex:0,claude:0},{key:'2026-09-12',codex:5,claude:5}];
 const format=value=>String(value);
 const zones=svg=>[...svg.matchAll(/class="chart-hover-zone" x="([\d.]+)" y="[\d.]+" width="([\d.]+)"/g)].map(match=>({x:Number(match[1]),width:Number(match[2])}));
+
+test('overview chart viewBox and plot use all available width even when its height is increased',()=>{
+ const size=overviewChartSize({width:1500,height:403,paddingLeft:14,paddingRight:20,paddingTop:10,paddingBottom:12});
+ assert.deepEqual(size,{width:1466,height:381});
+ const svg=seriesChart({rows,format,...size});
+ assert.match(svg,/viewBox="0 0 1466 381"/);
+ assert.match(svg,/class="grid-line" x1="[\d.]+" y1="17" x2="1452"/);
+});
 
 test('hover zones tile the plot so no period is dead to the pointer',()=>{
  const width=730,svg=seriesChart({rows,format,period:'day',width,height:220,idPrefix:'unit'});

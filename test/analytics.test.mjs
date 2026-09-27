@@ -76,6 +76,16 @@ test('limit cost ranges follow the provider reset boundary',()=>{
  assert.equal(rangeForLimitWindow({window_minutes:300,resets_at:null},{now}),null);
 });
 
+test('the last three months include today and roll over month ends without skipping February',()=>{
+ const now=new Date(2026,8,15,14,30).getTime(),range=rangeForPeriod('3months',{now});
+ assert.deepEqual([new Date(range.start).getFullYear(),new Date(range.start).getMonth(),new Date(range.start).getDate()],[2026,5,16]);
+ assert.equal(range.end,now);
+ const endOfMay=rangeForPeriod('3months',{now:new Date(2026,4,31,11,0).getTime()});
+ assert.deepEqual([new Date(endOfMay.start).getFullYear(),new Date(endOfMay.start).getMonth(),new Date(endOfMay.start).getDate()],[2026,2,1]);
+ const january=rangeForPeriod('3months',{now:new Date(2026,0,31,11,0).getTime()});
+ assert.deepEqual([new Date(january.start).getFullYear(),new Date(january.start).getMonth(),new Date(january.start).getDate()],[2025,10,1]);
+});
+
 test('the twelve-month range keeps local calendar days and includes today',()=>{
  const now=new Date(2026,8,15,14,30).getTime(),range=rangeForPeriod('12months',{now});
  assert.equal(new Date(range.start).getFullYear(),2025);assert.equal(new Date(range.start).getMonth(),8);assert.equal(new Date(range.start).getDate(),16);
