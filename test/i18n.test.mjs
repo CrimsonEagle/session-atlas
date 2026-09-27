@@ -51,6 +51,18 @@ test('overview separates subscription usage and recorded provider spending in En
  assert.equal(translateGerman('Weitere API-Anbieter'),'More API providers');
 });
 
+test('hermes collector panel translates in English',()=>{
+ assert.equal(translateGerman('Hermes-Limits sammeln'),'Collect Hermes limits');
+ assert.equal(translateGerman('Sammlung starten'),'Start collection');
+ assert.equal(translateGerman('Sammlung stoppen'),'Stop collection');
+ assert.equal(translateGerman('Sammlung aktiv'),'Collection active');
+ assert.equal(translateGerman('Sammlung gestoppt'),'Collection stopped');
+ assert.equal(translateGerman('Nicht eingerichtet'),'Not set up');
+ assert.equal(translateGerman('Nur Linux mit systemd --user'),'Linux with systemd --user only');
+ assert.equal(translateGerman('Hermes-Sammlung gestartet.'),'Hermes collection started.');
+ assert.equal(translateGerman('Letzter Abruf: 28.09.2026, 00:36 · Fehler: timeout'),'Last fetch: 28.09.2026, 00:36 · Error: timeout');
+});
+
 test('translation covers dynamic dialog copy without mixed-language fragments',()=>{
  assert.equal(translateGerman('Tag · 29 Abschnitte'),'Day · 29 periods');
  assert.equal(

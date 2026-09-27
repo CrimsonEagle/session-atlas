@@ -504,7 +504,16 @@ Object.assign(phrases,{
  'teils gemeldet, teils geschätzt':'partly reported, partly estimated','gemeldet':'reported','geschätzt':'estimated',
  'Messpunkte zeigen die gemeldete Auslastung; die Linien verbinden nur Messungen innerhalb desselben Resetfensters.':'Dots show reported usage; lines only connect measurements within the same reset window.',
  'Letzte Messung':'Latest measurement','Noch keine Messung im Zeitraum':'No measurement in this period','Reset nicht gemeldet':'Reset not reported',
- 'API-Kosten':'API costs'
+ 'API-Kosten':'API costs',
+ 'Nur Linux mit systemd --user':'Linux with systemd --user only','Nicht eingerichtet':'Not set up','Sammlung aktiv':'Collection active','Sammlung gestoppt':'Collection stopped',
+ 'Hermes-Limits sammeln':'Collect Hermes limits',
+ 'Alle 5 Minuten über Hermes abrufen; Dateien nur bei veränderten Werten schreiben. Läuft unabhängig von Atlas.':'Fetch via Hermes every 5 minutes; files are written only when values change. Runs independently of Atlas.',
+ 'Das Codex-Abo-Limit gilt für das gesamte Konto. Die Kostenlimit-Hochrechnung nutzt nur erfasste Hermes-Sessions mit Codex-Provider und ist eine Näherung.':'The Codex subscription limit applies to the whole account. The cost-limit extrapolation uses only recorded Hermes sessions with the Codex provider and is an approximation.',
+ 'Einmalig außerhalb von Atlas einrichten: ':'One-time setup outside Atlas: ','. Danach hier starten oder stoppen.':'. Then start or stop it here.',
+ 'Auf diesem Heimnetz kann jedes Gerät mit Zugriff auf Atlas diesen Schalter betätigen. Atlas-Autostart bleibt unverändert.':'On this home network, any device with access to Atlas can use this switch. Atlas autostart remains unchanged.',
+ 'Sammlung starten':'Start collection','Sammlung stoppen':'Stop collection',
+ 'Hermes-Sammlung gestartet.':'Hermes collection started.','Hermes-Sammlung gestoppt.':'Hermes collection stopped.',
+ 'Dienststatus nicht abrufbar':'Service status unavailable'
 });
 
 const replacements=Object.entries(phrases).sort((a,b)=>b[0].length-a[0].length);
@@ -576,7 +585,9 @@ export function translateGerman(value){
   .replace(/ Prozentpunkte/g,' percentage points')
   .replace(/ sortieren/g,' sort')
   .replace(/, aktuell aufsteigend/g,', currently ascending')
-  .replace(/, aktuell absteigend/g,', currently descending');
+  .replace(/, aktuell absteigend/g,', currently descending')
+  .replace(/Letzter Abruf: /g,'Last fetch: ')
+  .replace(/ · Fehler: /g,' · Error: ');
  return result;
 }
 
