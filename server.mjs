@@ -119,19 +119,19 @@ const server=http.createServer(async(req,res)=>{
     if(mutating)return json(409,{error:'Ein lokaler Datenstand wird gerade geändert.'});mutating=true;let previousCache;
     try{
      if(store.pending)await store.pending;await store.persist();const cacheFile=path.join(dataDir,'usage-cache.json');previousCache=await fs.readFile(cacheFile);
-     const fallback=await createBackup(dataDir,{sessionCount:store.snapshot(settings,{compact:true}).sessions.length}),backupDir=path.join(dataRoot,'recovery');await fs.mkdir(backupDir,{recursive:true});const fallbackFile=path.join(backupDir,`before-cache-reset-${new Date().toISOString().replaceAll(':','-')}.json.gz`);await fs.writeFile(fallbackFile,fallback.buffer);
+     const fallback=await createBackup(dataDir,{settings,sessionCount:store.snapshot(settings,{compact:true}).sessions.length}),backupDir=path.join(dataRoot,'recovery');await fs.mkdir(backupDir,{recursive:true});const fallbackFile=path.join(backupDir,`before-cache-reset-${new Date().toISOString().replaceAll(':','-')}.json.gz`);await fs.writeFile(fallbackFile,fallback.buffer);
      const replacement=new Store(cacheFile,priceHistory),snapshot=await replacement.scan(settings,{compact:true});store=replacement;return json(200,{ok:true,fallbackFile,snapshot});
     }catch(error){if(previousCache)try{const cacheFile=path.join(dataDir,'usage-cache.json'),rollback=cacheFile+'.reset-rollback';await fs.writeFile(rollback,previousCache);await fs.rename(rollback,cacheFile);}catch(rollbackError){error.message+=` · Cache-Rollback fehlgeschlagen: ${rollbackError.code||rollbackError.message}`;}throw error;}finally{mutating=false;}
    }
    if(url.pathname==='/api/backup/export'){
     if(mutating)return json(409,{error:'Ein lokaler Datenstand wird gerade geändert.'});mutating=true;try{if(store.pending)await store.pending;await store.persist();
-     const backup=await createBackup(dataDir,{sessionCount:store.snapshot(settings,{compact:true}).sessions.length});res.writeHead(200,{'Content-Type':'application/gzip','Content-Disposition':`attachment; filename="session-atlas-backup-${backup.createdAt.slice(0,10)}.json.gz"`,'Content-Length':backup.buffer.length});return res.end(backup.buffer);
+     const backup=await createBackup(dataDir,{settings,sessionCount:store.snapshot(settings,{compact:true}).sessions.length});res.writeHead(200,{'Content-Type':'application/gzip','Content-Disposition':`attachment; filename="session-atlas-backup-${backup.createdAt.slice(0,10)}.json.gz"`,'Content-Length':backup.buffer.length});return res.end(backup.buffer);
     }finally{mutating=false;}
    }
    if(url.pathname==='/api/backup/restore'){
     if(mutating)return json(409,{error:'Eine Änderung wird gerade gespeichert.'});const plan=restorePlans.get(input.restoreId);if(!plan||plan.expires<Date.now())return json(410,{error:'Die geprüfte Vorschau ist abgelaufen. Bitte die Sicherung erneut auswählen.'});mutating=true;
     const previous=active;try{
-     if(store.pending)await store.pending;await store.persist();const fallback=await createBackup(dataDir,{sessionCount:store.snapshot(settings,{compact:true}).sessions.length});const backupDir=path.join(dataRoot,'recovery');await fs.mkdir(backupDir,{recursive:true});const fallbackFile=path.join(backupDir,`before-restore-${new Date().toISOString().replaceAll(':','-')}.json.gz`);await fs.writeFile(fallbackFile,fallback.buffer);
+     if(store.pending)await store.pending;await store.persist();const fallback=await createBackup(dataDir,{settings,sessionCount:store.snapshot(settings,{compact:true}).sessions.length});const backupDir=path.join(dataRoot,'recovery');await fs.mkdir(backupDir,{recursive:true});const fallbackFile=path.join(backupDir,`before-restore-${new Date().toISOString().replaceAll(':','-')}.json.gz`);await fs.writeFile(fallbackFile,fallback.buffer);
      const prepared=await prepareState(dataRoot,mappedRestoreFiles(plan,input.rootMappings));await activateState(dataRoot,prepared);await reloadRuntime(prepared.dir);active=prepared;restorePlans.delete(input.restoreId);
      return json(200,{ok:true,fallbackFile,settings,pricing:priceSyncStatus(),priceHistory:priceHistory.status(),rates:effectiveRates(settings.prices),snapshot:store.snapshot(settings,{compact:true}),activeState:active.id});
     }catch(error){await activateStateId(dataRoot,previous.id);await reloadRuntime(previous.dir);active=previous;throw error;}finally{mutating=false;}

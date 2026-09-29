@@ -25,3 +25,15 @@ test('backup preview includes locally cached Hermes sessions and source roots',a
  assert.equal(preview.sessionCount,1);
  assert.deepEqual(preview.sourceRoots,[{tool:'hermes',path:'/home/user/.hermes'}]);
 });
+
+test('first-use backup includes effective settings even before they have been saved',async t=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'atlas-first-backup-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));
+ await fs.writeFile(path.join(root,'usage-cache.json'),JSON.stringify({version:7,files:{}}));
+ const settings={intervalSeconds:30,claudeRoots:[],codexRoots:[],hermesRoots:[],prices:{}};
+ const backup=await createBackup(root,{settings}),parsed=parseBackup(backup.buffer);
+ assert.deepEqual(JSON.parse(parsed.files['settings.json']),settings);
+ await assert.rejects(fs.stat(path.join(root,'settings.json')),{code:'ENOENT'});
+ await assert.rejects(createBackup(root),/nicht vollständig/);
+ await fs.rm(path.join(root,'usage-cache.json'));
+ await assert.rejects(createBackup(root,{settings}),/nicht vollständig/);
+});

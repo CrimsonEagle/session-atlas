@@ -108,3 +108,56 @@ test('Hermes parent links do not imply a subagent',async t=>{
  assert.equal(sessions.find(item=>item.sessionId.endsWith(':worker')).relationType,'subagent');
  assert.equal(sessions.find(item=>item.sessionId.endsWith(':worker')).subagent,true);
 });
+
+test('late Hermes model attribution replaces residual usage without increasing totals',async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'atlas-hermes-attribution-'));
+ const db=new DatabaseSync(path.join(dir,'state.db'));t.after(async()=>{db.close();await fs.rm(dir,{recursive:true,force:true});});
+ db.exec(`CREATE TABLE sessions(id TEXT, model TEXT, started_at REAL, input_tokens INTEGER, output_tokens INTEGER, api_call_count INTEGER, estimated_cost_usd REAL, cost_status TEXT, billing_provider TEXT);
+ INSERT INTO sessions VALUES('one','custom',1726048800,100,20,1,0.03,'estimated','openrouter');
+ CREATE TABLE session_model_usage(session_id TEXT, model TEXT, billing_provider TEXT, input_tokens INTEGER, output_tokens INTEGER, api_call_count INTEGER, estimated_cost_usd REAL, cost_status TEXT);
+ INSERT INTO session_model_usage VALUES('one','custom','openrouter',60,12,1,0.018,'estimated');`);
+ const settings={claudeRoots:[],codexRoots:[],hermesRoots:[dir],prices:{}},cache=path.join(dir,'cache.json');
+ let store=new Store(cache),session=(await store.scan(settings)).sessions[0];
+ assert.equal(totals(session.events).tokens,120);assert.equal(totals(session.events).requests,1);
+ assert.ok(session.events.some(event=>event.task==='unattributed'));
+ // A partial attribution update reduces the residual bucket rather than resetting it.
+ db.exec('UPDATE session_model_usage SET input_tokens=80, output_tokens=16, estimated_cost_usd=0.024');
+ session=(await store.scan(settings)).sessions[0];
+ assert.equal(totals(session.events).tokens,120);assert.equal(totals(session.events).requests,1);
+ assert.ok(Math.abs(totals(session.events).cost-.03)<1e-10);
+ store=new Store(cache);await store.load();
+ db.exec('UPDATE session_model_usage SET input_tokens=100, output_tokens=20, estimated_cost_usd=0.03');
+ session=(await store.scan(settings)).sessions[0];
+ assert.equal(totals(session.events).tokens,120);assert.equal(totals(session.events).requests,1);
+ assert.ok(Math.abs(totals(session.events).cost-.03)<1e-10);
+ assert.equal(session.events.some(event=>event.task==='unattributed'),false);
+ const restarted=new Store(cache);await restarted.load();session=(await restarted.scan(settings)).sessions[0];
+ assert.equal(totals(session.events).tokens,120);assert.equal(totals(session.events).requests,1);
+});
+
+test('Hermes legacy aggregate attribution and real counter resets retain the right history',async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'atlas-hermes-epochs-'));
+ const db=new DatabaseSync(path.join(dir,'state.db'));t.after(async()=>{db.close();await fs.rm(dir,{recursive:true,force:true});});
+ db.exec(`CREATE TABLE sessions(id TEXT, model TEXT, started_at REAL, input_tokens INTEGER, output_tokens INTEGER, api_call_count INTEGER, estimated_cost_usd REAL, cost_status TEXT, billing_provider TEXT);
+ INSERT INTO sessions VALUES('one','legacy',1726048800,100,20,1,0.03,'estimated','openrouter');`);
+ const settings={claudeRoots:[],codexRoots:[],hermesRoots:[dir],prices:{}},cache=path.join(dir,'cache.json');
+ let store=new Store(cache);await store.scan(settings);
+ db.exec(`CREATE TABLE session_model_usage(session_id TEXT, model TEXT, billing_provider TEXT, input_tokens INTEGER, output_tokens INTEGER, api_call_count INTEGER, estimated_cost_usd REAL, cost_status TEXT);
+ INSERT INTO session_model_usage VALUES('one','actual','openrouter',100,20,1,0.03,'estimated');`);
+ let session=(await store.scan(settings)).sessions[0];
+ assert.equal(totals(session.events).tokens,120);assert.equal(totals(session.events).requests,1);
+ assert.deepEqual([...new Set(session.events.map(event=>event.model))],['actual']);
+ db.exec('UPDATE sessions SET input_tokens=10,output_tokens=2,estimated_cost_usd=0.003; UPDATE session_model_usage SET input_tokens=10,output_tokens=2,estimated_cost_usd=0.003');
+ session=(await store.scan(settings)).sessions[0];assert.equal(totals(session.events).tokens,132);
+ store=new Store(cache);await store.load();
+ db.exec("UPDATE session_model_usage SET model='reattributed'");
+ session=(await store.scan(settings)).sessions[0];assert.equal(totals(session.events).tokens,132);
+ assert.equal(totals(session.events).requests,2);assert.ok(Math.abs(totals(session.events).cost-.033)<1e-10);
+ assert.equal(session.events.find(event=>event.model==='actual').input,100);
+ // Reusing the former model bucket and moving it again preserves its pre-reset history.
+ db.exec("UPDATE session_model_usage SET model='actual'");
+ session=(await store.scan(settings)).sessions[0];assert.equal(totals(session.events).tokens,132);
+ db.exec("UPDATE session_model_usage SET model='reattributed'");
+ session=(await store.scan(settings)).sessions[0];assert.equal(totals(session.events).tokens,132);
+ assert.equal(totals(session.events).requests,2);assert.ok(Math.abs(totals(session.events).cost-.033)<1e-10);
+});

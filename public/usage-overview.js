@@ -24,11 +24,13 @@ export function formatBillingCost(value,locale='de-DE') {
  return new Intl.NumberFormat(locale,{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:value>0&&value<.01?4:2}).format(value);
 }
 
-export function usageWindow(window,{now=Date.now(),serviceFresh=true}={}) {
+export function usageWindow(window,{now=Date.now()}={}) {
  const reset=window?.resets_at?Number(window.resets_at)*1000:null;
  const expired=reset!==null&&reset<=now;
  const used=window?.used_percent;
- return {known:Number.isFinite(used)&&!expired&&serviceFresh,used,reset,expired};
+ // An unchanged value can remain valid while no additional usage occurs.
+ // Only its reset, or a missing measurement, makes it unavailable.
+ return {known:Number.isFinite(used)&&!expired,used,reset,expired};
 }
 
 export function billingProviderSessions(sessions=[],provider='') {

@@ -8,6 +8,7 @@ import http from 'node:http';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import {runtimeRevision} from '../lib/runtime-revision.mjs';
+import {parseBackup} from '../lib/backup.mjs';
 
 test('HTTP API is local, rejects foreign origins/mutations, validates settings and shuts down',async t=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'session-atlas-http-'));
@@ -79,4 +80,21 @@ test('launcher reuses an existing server at the configured address', {skip:proce
  const [code]=await once(launcher,'exit');
  assert.equal(code,0);
  assert.equal(await fs.readFile(path.join(dir,'opened-url'),'utf8'),`http://127.0.0.2:${port}`);
+});
+
+test('a fresh installation exports and restores backups without saving settings first',async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'session-atlas-first-use-'));
+ const reserve=net.createServer();reserve.listen(0,'127.0.0.1');await once(reserve,'listening');const port=reserve.address().port;await new Promise(r=>reserve.close(r));
+ const child=spawn(process.execPath,['server.mjs'],{cwd:process.cwd(),env:{...process.env,ATLAS_HOST:'127.0.0.1',ATLAS_PORT:String(port),ATLAS_DATA_DIR:dir,CLAUDE_CONFIG_DIR:path.join(dir,'claude'),CODEX_HOME:path.join(dir,'codex'),HERMES_HOME:path.join(dir,'hermes')},windowsHide:true,stdio:['ignore','pipe','pipe']});
+ t.after(async()=>{if(child.exitCode===null){child.kill();await once(child,'exit');}await fs.rm(dir,{recursive:true,force:true});});
+ await once(child.stdout,'data');const base=`http://127.0.0.1:${port}`,bootstrap=await(await fetch(base+'/api/bootstrap')).json();
+ const headers={'X-Atlas-Token':bootstrap.token},post=(endpoint,input={})=>fetch(base+endpoint,{method:'POST',headers,body:JSON.stringify(input)});
+ const response=await post('/api/backup/export');assert.equal(response.status,200);
+ const buffer=Buffer.from(await response.arrayBuffer());assert.deepEqual(JSON.parse(parseBackup(buffer).files['settings.json']),bootstrap.settings);
+ const preview=await(await fetch(base+'/api/backup/preview',{method:'POST',headers,body:buffer})).json();
+ const restored=await(await post('/api/backup/restore',{restoreId:preview.restoreId})).json();
+ assert.equal(restored.ok,true);assert.deepEqual(restored.settings,bootstrap.settings);
+ assert.deepEqual(JSON.parse(parseBackup(await fs.readFile(restored.fallbackFile)).files['settings.json']),bootstrap.settings);
+ const reset=await(await post('/api/cache/reset')).json();assert.equal(reset.ok,true);
+ assert.ok(parseBackup(await fs.readFile(reset.fallbackFile)).files['settings.json']);
 });

@@ -403,7 +403,7 @@ Object.assign(phrases,{
  'Backup erstellen':'Create backup','Backup wiederherstellen':'Restore backup',
  'Maximal 64 MB komprimiert und 256 MB entpackt. Vor jeder Wiederherstellung wird automatisch ein Rückfallstand angelegt.':'Maximum 64 MB compressed and 256 MB unpacked. A fallback snapshot is created automatically before each restore.',
  'Claude-Limits aktuell halten':'Keep Claude limits current','Die optionale Statusline-Bridge übernimmt bei jedem Rendern einen frischen Messwert.':'The optional status-line bridge captures a fresh reading on every render.',
- 'Letzter Messwert':'Latest reading','Ohne Bridge können die Werte aus .claude.json mehrere Tage alt sein.':'Without the bridge, values from .claude.json may be several days old.',
+ 'Letzter Messwert':'Latest reading','Kein Reset gemeldet':'No reset reported','Letzter gespeicherter Messwert; kein Reset gemeldet':'Last saved reading; no reset reported','Ohne Bridge können die Werte aus .claude.json mehrere Tage alt sein.':'Without the bridge, values from .claude.json may be several days old.',
  'Einrichtung für eine neue oder bereits vorhandene Claude-Code-Statusline.':'Setup for a new or existing Claude Code status line.','Bridge einrichten':'Set up bridge','Statusline-Bridge einrichten':'Set up status-line bridge',
  'zwei Varianten':'two options','Variante 1 · noch keine Statusline eingerichtet':'Option 1 · no status line configured yet','Variante 2 · vorhandene Statusline behalten':'Option 2 · keep the existing status line',
  'Schalter der Bridge':'Bridge options','Vorher:':'Before:','Nachher:':'After:',

@@ -66,12 +66,20 @@ test('small nonzero provider amounts are not displayed as zero',()=>{
  assert.equal(formatBillingCost(.11,'de-DE'),'0,11 $');
 });
 
-test('usage window hides stale, missing and stopped collector readings without losing reset context',()=>{
+test('usage window keeps saved readings and hides missing or reset windows',()=>{
  const now=Date.parse('2026-09-27T12:00:00Z');
  const window={used_percent:42,resets_at:(now+3600000)/1000};
  assert.deepEqual(usageWindow(window,{now}),{known:true,used:42,reset:now+3600000,expired:false});
- assert.equal(usageWindow(window,{now,serviceFresh:false}).known,false);
  assert.equal(usageWindow({...window,resets_at:(now-1000)/1000},{now}).expired,true);
  assert.equal(usageWindow(null,{now}).known,false);
  assert.equal(usageWindow({...window,used_percent:NaN},{now}).known,false);
+});
+
+test('saved limits stay visible regardless of age or collector state until their reset',()=>{
+ const now=Date.parse('2026-09-29T12:00:00Z'),window={used_percent:42,resets_at:(now+3*86400000)/1000};
+ const saved=usageWindow(window,{now,observedAt:'2026-09-26T12:00:00Z',serviceFresh:false});
+ assert.equal(saved.known,true);assert.equal(saved.expired,false);
+ assert.equal(usageWindow({...window,resets_at:null},{now,observedAt:'2026-09-26T12:00:00Z'}).known,true);
+ assert.equal(usageWindow(window,{now:window.resets_at*1000}).known,false);
+ assert.equal(usageWindow({...window,used_percent:0},{now}).known,true);
 });

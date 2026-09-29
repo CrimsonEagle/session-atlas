@@ -31,7 +31,7 @@ test('Atlas drains offline inbox only after persist; keeps returning values and 
  const restored=new Store(cache);await restored.load();assert.equal(restored.snapshot(settings(home)).limitHistory.filter(p=>p.tool==='hermes').length,6);
  const html=limitHistoryView({history:restored.limitHistory,tool:'hermes',mode:'cost',period:'all',esc:String,date:String});assert.match(html,/data-limit-history-mode="cost"[^>]*aria-pressed="true"/);assert.match(html,/noch kein Kostenlimit hochrechnen/i);
 });
-test('installer creates only a fixed stopped user timer and service',async t=>{
+test('installer creates only a fixed stopped user timer and service',{skip:process.platform!=='linux'},async t=>{
  const home=await fixture(t),config=path.join(home,'config');await install({configHome:config,home,cli:process.execPath,reload:false});
  const service=await fs.readFile(path.join(config,'systemd/user/session-atlas-hermes-usage.service'),'utf8'),timer=await fs.readFile(path.join(config,'systemd/user/session-atlas-hermes-usage.timer'),'utf8');
  assert.match(service,/Type=oneshot/);assert.match(timer,/OnUnitActiveSec=5min/);assert.doesNotMatch(timer,/OnBootSec|ExecStart/);assert.doesNotMatch(service,/WantedBy/);
