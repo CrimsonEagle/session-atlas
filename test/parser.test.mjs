@@ -114,3 +114,9 @@ test('Claude thinking tokens are reported as reasoning without changing output',
  const s=newState('claude','session.jsonl');ingest(s,{type:'assistant',timestamp:'2026-10-01T10:00:00Z',sessionId:'session',message:{id:'m',model:'claude-opus-5-5',usage:{input_tokens:1,output_tokens:30,output_tokens_details:{thinking_tokens:12}}}});
  const [event]=sessionEvents(s);assert.equal(event.output,30);assert.equal(event.reasoning,12);
 });
+test('GPT long-context and priority rules cover point releases such as gpt-6.1',()=>{
+ const e=(model,tier='standard',input=1e6)=>({model,input,cache:0,write:0,writeHour:0,output:1e6,reasoning:0,tier,geo:''});
+ assert.equal(costFor(e('gpt-6-sol','standard',100000),{}),.2+10);assert.equal(costFor(e('gpt-6.1-sol','standard',100000),{}),.2+10);
+ assert.equal(costFor(e('gpt-6.1-sol'),{}),2*2+10*1.5);assert.equal(costFor(e('gpt-6.1-sol','priority',100000),{}),(.2+10)*2);
+ assert.equal(costFor(e('gpt-6-luna','standard',100000),{}),.01+.5);assert.equal(costFor(e('gpt-60-sol'),{}),null);
+});
