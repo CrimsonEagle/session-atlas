@@ -31,6 +31,7 @@ test('translation covers static labels and dynamic usage sentences',()=>{
  assert.equal(translateGerman('Gesamt 120 ms · Scan 25 ms'),'Total 120 ms · Scan 25 ms');
  assert.equal(translateGerman('Woche ab Donnerstag, 10. September 2026'),'Week of Thursday, 10. September 2026');
  assert.equal(translateGerman('Tokens'),'Tokens');
+ assert.equal(translateGerman('Unbekannter Ordner'),'Unknown folder');
  assert.equal(translateGerman('Linux-Autostart'),'Linux startup');
  assert.equal(translateGerman('App beendet. Zum Starten sh Start.sh ausführen.'),'App stopped. Run sh Start.sh to start it again.');
 });

@@ -30,7 +30,7 @@ Closing the browser tab leaves the idle server running. Use **Exit App Completel
 | **Visible Providers** | Per provider: hiding an AI tool removes its usage data, chart series, filters, and limit card; hiding OpenRouter hides only its recorded-spending card while totals and usage data stay unchanged. Saved with the settings. |
 | **Limit Notifications** | Thresholds default to 80% and 95%, with at most one notification per threshold and reset window. Limit history is kept for 90 days by default. |
 | **Hermes Limits** | On Linux, install the separate user timer once (below), then start or stop it in **Settings → Limits**. Atlas itself needs no autostart. |
-| **Keep Claude Limits Current** | The optional status-line bridge below records updated Claude limit measurements. Without it, Atlas uses the latest values Claude Code has stored locally, which may be old. |
+| **Keep Claude Limits Current** | The optional status-line bridge below records updated Claude limit measurements. Without it, Atlas uses the latest values Claude Code has stored locally, which may be old. Code sessions in Claude Desktop do not run a status line; Cowork tasks supply readings automatically, because limits apply to the whole account. |
 | **Update Model Prices** | Update prices manually from LiteLLM, models.dev, and OpenRouter. No session data is sent. Manual prices take precedence; bundled prices remain a fallback. There is no background price download. |
 | **Backup & Restore** | Export a local `.json.gz` backup of app data and settings. Import validates and previews it, can remap missing source folders, and saves a recovery snapshot before restoration. Original logs and startup configuration are not included. Backups contain personal paths and session titles. |
 | **Theme** | Choose a color theme and light, dark, or system mode. |
@@ -42,11 +42,12 @@ Closing the browser tab leaves the idle server running. Use **Exit App Completel
 | Tool | Default sources |
 | --- | --- |
 | Claude Code | `~/.claude/projects` including subagents; limit data from `~/.claude.json` and the optional bridge files under `~/.claude` |
+| Claude Cowork (Claude Desktop) | `local-agent-mode-sessions` in Claude Desktop's data folder (`%APPDATA%\Claude` on Windows, `~/Library/Application Support/Claude` on macOS, `~/.config/Claude` on Linux): task transcripts count as Claude Code sessions, titles come from the task metadata, and `rate_limit_event` entries in `audit.jsonl` provide account-wide Claude limit readings. Only limit values, titles, and transcript IDs are taken from these files; uploads, outputs, mounted folders, and plugin caches are not read |
 | Codex | `~/.codex/sessions`, `~/.codex/archived_sessions`, and the read-only `state_*.sqlite` metadata database |
 | Hermes Agent | `~/.hermes/state.db` and profile databases under `~/.hermes/profiles` on Linux; `%LOCALAPPDATA%/hermes` by default on Windows |
 | OpenRouter | No separate files: spending comes from the billing provider recorded in Hermes sessions; model prices come from the public OpenRouter models endpoint during a manual price update |
 
-`~` is the current user's home directory. Session logs and source databases are read-only. Atlas discards prompt and response text while parsing and does not access credentials. Its local cache stores usage, session metadata, and limit history under `.local/states/<id>/`. Browser data is not collected. A backup preserves the imported history even if the original logs are no longer available.
+`~` is the current user's home directory. Session logs and source databases are read-only. Atlas discards prompt and response text while parsing and does not access credentials. Its local cache stores usage, session metadata, and limit history under `.local/states/<id>/`. While logs only grow, the cache is rewritten at most every two minutes and on exit; limit changes are saved immediately, and any unsaved log progress is simply read again after an unexpected stop. Browser data is not collected. A backup preserves the imported history even if the original logs are no longer available.
 
 ### Optional Claude Code status-line bridge
 
@@ -90,7 +91,7 @@ Environment variables must be available to the process that starts Atlas. For pe
 - Subscription limits are account-wide measurements, not values reconstructed from session logs. Saved measurements remain visible regardless of age; missing measurements or windows whose reset has passed appear as unknown. Rolling five-hour and seven-day costs are separate estimates and do not match subscription billing windows.
 - The tooltip shows when a limit was last measured. An old timestamp alone does not invalidate a value; if no reset is reported, the saved value remains visible until replaced.
 - Context timelines show only values present in the logs. Deleted source logs remain in the imported history; removing a data source excludes it from analytics.
-- Claude responses are deduplicated by message ID. Codex response records take precedence over cumulative snapshots when available. Hermes usage comes from local SQLite counters and represents usage measurements rather than individual model responses.
+- Claude responses are deduplicated by message ID, also across session files: a response repeated in a copied or forked transcript counts once, for the earliest session. Where Claude Code stores its own running cost estimate (`cost-state`), the session details compare it with Atlas's estimate for the whole session including subagents. Codex response records take precedence over cumulative snapshots when available. Hermes usage comes from local SQLite counters and represents usage measurements rather than individual model responses.
 
 ## Share or develop
 

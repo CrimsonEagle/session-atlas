@@ -189,3 +189,59 @@ test('Context history deduplicates archive copies and never adds usage events',a
  const compactSnapshot=store.snapshot(settings,{compact:true});assert.equal(compactSnapshot.limitHistory,undefined);assert.equal(compactSnapshot.sessions[0].contextTimeline,undefined);assert.equal(compactSnapshot.sessions[0].events[0].pricingMode,undefined);assert.equal(typeof compactSnapshot.sessions[0].events[0].cost,'number');assert.equal(typeof compactSnapshot.detailRevision,'string');
  const detailed=store.snapshot(settings,{sessionId:'claude:session',includeLimitHistory:false});assert.equal(detailed.sessions.length,1);assert.equal(detailed.sessions[0].contextTimeline.length,2);assert.equal(detailed.sessions[0].events[0].pricingMode,'current');assert.equal(detailed.detailRevision,compactSnapshot.detailRevision);
 });
+const claudeLine=(session,id,time,extra={})=>JSON.stringify({type:'assistant',timestamp:time,sessionId:session,cwd:'C:/example',message:{id,model:'claude-opus-5-5',usage:{input_tokens:100,output_tokens:10,output_tokens_details:{thinking_tokens:4}}},...extra})+'\n';
+test('Claude responses copied into another session file are counted once, by the earliest session',async t=>{
+ const {dir,logs,settings}=await fixture(t),cache=path.join(dir,'cache.json');
+ await fs.writeFile(path.join(logs,'original.jsonl'),claudeLine('original','msg-0','2026-09-11T09:59:00Z')+claudeLine('original','msg-a','2026-09-11T10:00:00Z')+claudeLine('original','msg-b','2026-09-11T10:01:00Z'));
+ await fs.writeFile(path.join(logs,'fork.jsonl'),claudeLine('fork','msg-a','2026-09-11T10:00:00Z')+claudeLine('fork','msg-b','2026-09-11T10:01:00Z')+claudeLine('fork','msg-c','2026-09-11T11:00:00Z'));
+ const store=new Store(cache),events=snapshot=>Object.fromEntries(snapshot.sessions.map(session=>[session.sessionId,session.events.map(event=>event.id).sort()]));
+ let snapshot=await store.scan(settings);
+ assert.deepEqual(events(snapshot),{original:['claude:msg-0','claude:msg-a','claude:msg-b'],fork:['claude:msg-c']});
+ assert.deepEqual(store.snapshot(settings,{sessionId:'claude:fork'}).sessions[0].events.map(event=>event.id),['claude:msg-c']);
+ assert.equal(snapshot.sessions.flatMap(session=>session.events).find(event=>event.id==='claude:msg-a').reasoning,4);
+ const restored=new Store(cache);await restored.load();assert.deepEqual(events(restored.snapshot(settings)),events(snapshot));
+ // Removing the original file hands the copied responses back to the remaining session.
+ await fs.rm(path.join(logs,'original.jsonl'));const other=path.join(dir,'other');await fs.mkdir(other);
+ assert.deepEqual(events(restored.snapshot({...settings,claudeRoots:[other]})),{});
+ await fs.rename(path.join(logs,'fork.jsonl'),path.join(other,'fork.jsonl'));
+ snapshot=await restored.scan({...settings,claudeRoots:[other]});
+ assert.deepEqual(events(snapshot),{fork:['claude:msg-a','claude:msg-b','claude:msg-c']});
+});
+test('Claude cost-state is exposed per session for the plausibility check',async t=>{
+ const {dir,logs,settings}=await fixture(t);
+ const state=(session,cost)=>JSON.stringify({type:'cost-state',sessionId:session,totalCostUSD:cost,hasUnknownModelCost:false,modelUsage:{'claude-opus-5-5[1m]':{costUSD:cost}}})+'\n';
+ await fs.writeFile(path.join(logs,'main.jsonl'),claudeLine('main','msg-a','2026-09-11T10:00:00Z')+state('main',.1)+state('other',9)+state('main',.25));
+ const session=(await new Store(path.join(dir,'cache.json')).scan(settings)).sessions[0];
+ assert.deepEqual(session.reportedCost,{costUSD:.25,unknownModelCost:false,models:{'claude-opus-5-5[1m]':.25}});
+});
+test('Persisted cache omits redundant Codex deltas and limit observations',async t=>{
+ const {dir,logs,settings}=await fixture(t),cache=path.join(dir,'cache.json'),codex=path.join(dir,'codex');await fs.mkdir(codex);
+ const limits=codexLine({type:'event_msg',timestamp:'2026-09-11T10:02:00Z',payload:{type:'token_count',rate_limits:{limit_id:'codex',primary:{used_percent:20,window_minutes:300}},info:{last_token_usage:{input_tokens:50,output_tokens:10},total_token_usage:{input_tokens:150,output_tokens:20}}}});
+ await fs.writeFile(path.join(codex,'thread.jsonl'),codexMeta()+codexCumulative()+codexRecord()+limits);
+ const current={...settings,codexRoots:[codex]},store=new Store(cache),snapshot=await store.scan(current);
+ assert.deepEqual(snapshot.sessions[0].events.map(event=>event.id),['codex:response']);
+ assert.ok(store.limitHistory.some(point=>point.tool==='codex'));
+ const saved=Object.values(JSON.parse(await fs.readFile(cache,'utf8')).files)[0];
+ assert.deepEqual(saved.events,{});assert.equal(saved.limitObservations,undefined);assert.equal(Object.keys(saved.records).length,1);
+ const restored=new Store(cache);await restored.load();assert.deepEqual(restored.snapshot(current).sessions[0].events.map(event=>event.id),['codex:response']);
+});
+test('A Claude parser upgrade re-reads Claude logs without touching unchanged Codex logs',async t=>{
+ const {dir,logs,settings}=await fixture(t),cache=path.join(dir,'cache.json'),codex=path.join(dir,'codex');await fs.mkdir(codex);
+ await fs.writeFile(path.join(codex,'thread.jsonl'),codexMeta()+codexRecord());await fs.writeFile(path.join(logs,'main.jsonl'),claudeLine('main','msg-a','2026-09-11T10:00:00Z'));
+ const current={...settings,codexRoots:[codex]};await new Store(cache).scan(current);
+ const saved=JSON.parse(await fs.readFile(cache,'utf8'));for(const state of Object.values(saved.files))if(state.tool==='claude')state.parserVersion=6;await fs.writeFile(cache,JSON.stringify(saved));
+ const store=new Store(cache);await store.load();const snapshot=await store.scan(current);
+ assert.equal(snapshot.stats.changed,1);assert.equal(snapshot.stats.bytes,(await fs.stat(path.join(logs,'main.jsonl'))).size);
+});
+test('Deferred persistence keeps appended responses in memory until the interval or a flush',async t=>{
+ const {dir,logs,settings}=await fixture(t),cache=path.join(dir,'cache.json'),file=path.join(logs,'main.jsonl');
+ await fs.writeFile(file,claudeLine('main','msg-a','2026-09-11T10:00:00Z'));
+ const store=new Store(cache,null,{persistIntervalMs:60000}),persisted=async()=>{const restored=new Store(cache);await restored.load();return restored.snapshot(settings).sessions[0]?.events.length||0;};
+ await store.scan(settings);assert.equal(await persisted(),1);
+ await fs.appendFile(file,claudeLine('main','msg-b','2026-09-11T10:01:00Z'));
+ assert.equal((await store.scan(settings)).sessions[0].events.length,2);assert.equal(await persisted(),1);assert.equal(store.cacheDirty,true);
+ await store.flush();assert.equal(await persisted(),2);assert.equal(store.cacheDirty,false);
+ // A restart from the older cache re-reads the unsaved part of the log and reaches the same totals.
+ await fs.appendFile(file,claudeLine('main','msg-c','2026-09-11T10:02:00Z'));await store.scan(settings);
+ const restarted=new Store(cache);await restarted.load();assert.equal((await restarted.scan(settings)).sessions[0].events.length,3);
+});

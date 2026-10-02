@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import {PARSER_VERSION,newState,ingest,sessionEvents} from '../lib/parser.mjs';
+import {parserVersionFor,newState,ingest,sessionEvents} from '../lib/parser.mjs';
 import {costFor} from '../lib/pricing.mjs';
 const time='2026-09-11T10:00:00.000Z';
 const event=(usage,total=usage,t=time)=>({timestamp:t,type:'event_msg',payload:{type:'token_count',info:{last_token_usage:usage,total_token_usage:total}}});
@@ -30,7 +30,7 @@ test('Inherited history before session creation only establishes a cumulative ba
 });
 test('Codex session metadata preserves only explicit task relationships',()=>{
  const child=newState('codex','child.jsonl');ingest(child,{timestamp:time,type:'session_meta',payload:{id:'child',parent_thread_id:'parent',thread_source:'subagent'}});
- assert.equal(child.parserVersion,PARSER_VERSION);assert.equal(child.parentId,'parent');assert.equal(child.relationType,'subagent');assert.equal(child.relationEvidence,'session_meta.parent_thread_id');assert.equal(child.subagent,true);
+ assert.equal(child.parserVersion,parserVersionFor('codex'));assert.equal(child.parentId,'parent');assert.equal(child.relationType,'subagent');assert.equal(child.relationEvidence,'session_meta.parent_thread_id');assert.equal(child.subagent,true);
  const review=newState('codex','review.jsonl');ingest(review,{timestamp:time,type:'session_meta',payload:{id:'review',parent_thread_id:'parent',thread_source:'guardian_review'}});
  assert.equal(review.relationType,'guardian_review');assert.equal(review.subagent,true);
  const fork=newState('codex','fork.jsonl');ingest(fork,{timestamp:time,type:'session_meta',payload:{id:'fork',forked_from_id:'source',thread_source:'user'}});
@@ -87,8 +87,8 @@ test('Limits update even when the token snapshot is unchanged',()=>{
  assert.equal(s.limits.codex.primary.used_percent,34);assert.equal(sessionEvents(s).length,1);
 });
 test('Codex keeps distinct historical limit observations for E3',()=>{
- const s=newState('codex','test.jsonl'),one=event(usage(100)),two=event(usage(100),usage(100),'2026-09-11T10:05:00Z');one.payload.rate_limits={limit_id:'codex',primary:{used_percent:20,window_minutes:300}};two.payload.rate_limits={limit_id:'codex',primary:{used_percent:30,window_minutes:300}};ingest(s,one);ingest(s,two);
- assert.equal(Object.keys(s.limitObservations).length,2);assert.deepEqual(Object.values(s.limitObservations).map(limit=>limit.primary.used_percent),[20,30]);
+ const s=newState('codex','test.jsonl'),observed=[],one=event(usage(100)),two=event(usage(100),usage(100),'2026-09-11T10:05:00Z');one.payload.rate_limits={limit_id:'codex',primary:{used_percent:20,window_minutes:300}};two.payload.rate_limits={limit_id:'codex',primary:{used_percent:30,window_minutes:300}};ingest(s,one,observed);ingest(s,two,observed);
+ assert.deepEqual(observed.map(limit=>limit.primary.used_percent),[20,30]);assert.equal(s.limits.codex.primary.used_percent,30);assert.equal(s.limitObservations,undefined);
 });
 test('Prices account for cache TTL and do not double charge reasoning',()=>{
  const e={model:'claude-opus-4-8',input:1e6,cache:1e6,write:2e6,writeHour:1e6,output:1e6,reasoning:500000,tier:'standard'};
@@ -102,4 +102,15 @@ test('Unknown model and unsupported fast rate stay unknown',()=>{
 test('Dated Claude model names resolve and published Codex fast prices apply',()=>{
  const e={model:'claude-haiku-4-5-20251001',input:100,cache:0,write:0,writeHour:0,output:20};assert.equal(costFor(e),.0002);
  assert.equal(costFor({...e,model:'gpt-6-astra',tier:'priority'}),.004);
+});
+test('Bundled prices cover current and dated legacy Claude models, including Opus 5.5 fast mode',()=>{
+ const e=(model,tier='standard')=>({model,input:1e6,cache:1e6,write:1e6,writeHour:1e6,output:1e6,reasoning:0,tier,geo:''});
+ assert.equal(costFor(e('claude-opus-5-5'),{}),4+.2+20+8);assert.equal(costFor(e('claude-opus-5-5','fast'),{}),(4+.2+20+8)*2);
+ assert.equal(costFor(e('claude-sonnet-5-5'),{}),2+.2+10+4);assert.equal(costFor(e('claude-fable-5'),{}),10+1+50+20);
+ assert.equal(costFor(e('claude-3-5-haiku-20241022'),{}),.8+.08+4+1.6);assert.equal(costFor(e('claude-3-7-sonnet-20250219'),{}),3+.3+15+6);
+ assert.equal(costFor(e('claude-sonnet-5-5','fast'),{}),null);
+});
+test('Claude thinking tokens are reported as reasoning without changing output',()=>{
+ const s=newState('claude','session.jsonl');ingest(s,{type:'assistant',timestamp:'2026-10-01T10:00:00Z',sessionId:'session',message:{id:'m',model:'claude-opus-5-5',usage:{input_tokens:1,output_tokens:30,output_tokens_details:{thinking_tokens:12}}}});
+ const [event]=sessionEvents(s);assert.equal(event.output,30);assert.equal(event.reasoning,12);
 });

@@ -15,6 +15,7 @@ import {createBackup,parseBackup,MAX_BACKUP_COMPRESSED} from './lib/backup.mjs';
 import {staticAsset} from './lib/static-assets.mjs';
 import {runtimeRevision} from './lib/runtime-revision.mjs';
 import {defaultHermesHome,hermesRootId,validateHermesRoots} from './lib/hermes-local.mjs';
+import {defaultCoworkRoot} from './lib/cowork.mjs';
 import {collectorStatus,setCollectorEnabled} from './lib/hermes-collector-service.mjs';
 
 const root=path.dirname(fileURLToPath(import.meta.url));
@@ -28,37 +29,42 @@ if(isIP(bindHost)!==4||bindHost==='0.0.0.0')throw Error('ATLAS_HOST muss eine ko
 const origin=`http://${bindHost}:${port}`;
 const token=randomBytes(32).toString('hex');
 const defaultThresholds={codex:{300:[80,95],10080:[80,95]},claude:{300:[80,95],10080:[80,95]},hermes:{300:[80,95],10080:[80,95]}};
-const defaults={intervalSeconds:30,hiddenProviders:[],limitRetentionDays:90,limitThresholds:defaultThresholds,claudeRoots:[path.join(process.env.CLAUDE_CONFIG_DIR||path.join(os.homedir(),'.claude'),'projects')],codexRoots:[path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'sessions'),path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'archived_sessions')],hermesRoots:[defaultHermesHome()],prices:{},pricingMode:'current',priceEffectiveFrom:''};
+const defaults={intervalSeconds:30,hiddenProviders:[],limitRetentionDays:90,limitThresholds:defaultThresholds,claudeRoots:[path.join(process.env.CLAUDE_CONFIG_DIR||path.join(os.homedir(),'.claude'),'projects')],codexRoots:[path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'sessions'),path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'archived_sessions')],hermesRoots:[defaultHermesHome()],coworkRoots:[defaultCoworkRoot()],prices:{},pricingMode:'current',priceEffectiveFrom:''};
 let settings={...defaults};
 try {settings={...defaults,...JSON.parse(await fs.readFile(path.join(dataDir,'settings.json'),'utf8'))};}catch{}
 let priceHistory=new PriceHistory(path.join(dataDir,'price-history.json'));await priceHistory.load();
-if(!priceHistory.snapshots.length)await priceHistory.capture({overrides:settings.prices,source:'upgrade',sourceDetails:{note:'Initialer lokaler Preisstand'}});
-let store=new Store(path.join(dataDir,'usage-cache.json'),priceHistory);await store.load();
+// A program update can change bundled prices or pricing rules; record that table once so current
+// valuations keep a snapshot reference and historical mode can use it from now on.
+if(!priceHistory.matchingSnapshot(effectiveRates(settings.prices)))await priceHistory.capture({overrides:settings.prices,source:'upgrade',sourceDetails:{note:priceHistory.snapshots.length?'Preisstand nach Programmaktualisierung':'Initialer lokaler Preisstand'}});
+// Appended log responses are re-read after a crash, so a running session does not need the full
+// cache rewritten on every refresh; limits and metadata are still saved immediately.
+const storeOptions={persistIntervalMs:120000};
+let store=new Store(path.join(dataDir,'usage-cache.json'),priceHistory,storeOptions);await store.load();
 function validateSettings(x) {
  if(!Number.isInteger(x.intervalSeconds)||x.intervalSeconds<10||x.intervalSeconds>3600)throw Error('Aktualisierung: 10 bis 3600 Sekunden.');
  if(!Array.isArray(x.hiddenProviders)||x.hiddenProviders.some(provider=>!['codex','claude','hermes','openrouter'].includes(provider)))throw Error('Ungültige Provider-Sichtbarkeit.');
- for(const k of ['claudeRoots','codexRoots'])if(!Array.isArray(x[k])||x[k].length>20||x[k].some(p=>typeof p!=='string'||!path.isAbsolute(p)||p.length>2000))throw Error('Bitte gültige absolute Ordnerpfade eintragen.');
+ for(const k of ['claudeRoots','codexRoots','coworkRoots'])if(!Array.isArray(x[k])||x[k].length>20||x[k].some(p=>typeof p!=='string'||!path.isAbsolute(p)||p.length>2000))throw Error('Bitte gültige absolute Ordnerpfade eintragen.');
  if(!x.prices||typeof x.prices!=='object'||Array.isArray(x.prices))throw Error('Preise müssen ein JSON-Objekt sein.');
  for(const [model,r] of Object.entries(x.prices))if(model.length>120||!Array.isArray(r)||r.length<3||r.length>5||r.some(v=>!Number.isFinite(v)||v<0||v>100000))throw Error('Preise: je Modell 3 bis 5 nichtnegative Zahlen.');
  if(!Number.isInteger(x.limitRetentionDays)||x.limitRetentionDays<30||x.limitRetentionDays>3650)throw Error('Limitverlauf: 30 bis 3650 Tage Aufbewahrung.');
  if(!['current','historical'].includes(x.pricingMode))throw Error('Ungültiger Bewertungsmodus.');
  if(x.priceEffectiveFrom&& !Number.isFinite(Date.parse(x.priceEffectiveFrom)))throw Error('Ungültiger Gültigkeitsbeginn für manuelle Preise.');
  const limitThresholds={};for(const tool of ['codex','claude','hermes']){limitThresholds[tool]={};for(const minutes of [300,10080]){const values=x.limitThresholds?.[tool]?.[minutes]||defaultThresholds[tool][minutes];if(!Array.isArray(values)||values.length<1||values.length>5||values.some(value=>!Number.isFinite(value)||value<=0||value>100))throw Error('Limitschwellen: 1 bis 5 Prozentwerte zwischen 1 und 100.');limitThresholds[tool][minutes]=[...new Set(values)].sort((a,b)=>a-b);}}
- return {intervalSeconds:x.intervalSeconds,hiddenProviders:[...new Set(x.hiddenProviders)],limitRetentionDays:x.limitRetentionDays,limitThresholds,claudeRoots:x.claudeRoots.map(p=>path.resolve(p)),codexRoots:x.codexRoots.map(p=>path.resolve(p)),hermesRoots:validateHermesRoots(x.hermesRoots),prices:x.prices,pricingMode:x.pricingMode,priceEffectiveFrom:x.priceEffectiveFrom?new Date(x.priceEffectiveFrom).toISOString():''};
+ return {intervalSeconds:x.intervalSeconds,hiddenProviders:[...new Set(x.hiddenProviders)],limitRetentionDays:x.limitRetentionDays,limitThresholds,claudeRoots:x.claudeRoots.map(p=>path.resolve(p)),codexRoots:x.codexRoots.map(p=>path.resolve(p)),coworkRoots:x.coworkRoots.map(p=>path.resolve(p)),hermesRoots:validateHermesRoots(x.hermesRoots),prices:x.prices,pricingMode:x.pricingMode,priceEffectiveFrom:x.priceEffectiveFrom?new Date(x.priceEffectiveFrom).toISOString():''};
 }
 let mutating=false;
 const restorePlans=new Map();
 async function readBody(req,max){const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>max)throw Object.assign(Error(`Anfrage überschreitet ${Math.round(max/1024/1024)} MB.`),{statusCode:413});chunks.push(chunk);}return Buffer.concat(chunks);}
 async function reloadRuntime(nextDir){
  await loadPriceCache(nextDir);let restored={...defaults,...JSON.parse(await fs.readFile(path.join(nextDir,'settings.json'),'utf8'))};restored=validateSettings(restored);
- const history=new PriceHistory(path.join(nextDir,'price-history.json'));await history.load();if(!history.snapshots.length)await history.capture({overrides:restored.prices,source:'restore-upgrade',sourceDetails:{note:'Beim Wiederherstellen ergänzter initialer Preisstand'}});
- const nextStore=new Store(path.join(nextDir,'usage-cache.json'),history);await nextStore.load();dataDir=nextDir;settings=restored;priceHistory=history;store=nextStore;
+ const history=new PriceHistory(path.join(nextDir,'price-history.json'));await history.load();if(!history.matchingSnapshot(effectiveRates(restored.prices)))await history.capture({overrides:restored.prices,source:'restore-upgrade',sourceDetails:{note:'Beim Wiederherstellen ergänzter Preisstand'}});
+ const nextStore=new Store(path.join(nextDir,'usage-cache.json'),history,storeOptions);await nextStore.load();dataDir=nextDir;settings=restored;priceHistory=history;store=nextStore;
 }
 function mappedRestoreFiles(plan,mappings){
  if(!mappings||!Object.keys(mappings).length)return plan.files;const allowed=new Set((plan.preview.sourceRoots||[]).map(item=>item.path)),pairs=Object.entries(mappings).filter(([,value])=>value);
  if(pairs.length>20||pairs.some(([from,to])=>!allowed.has(from)||typeof to!=='string'||!path.isAbsolute(to)||to.length>2000))throw Error('Die Quellordner-Zuordnung ist ungültig.');
  const settingsFile=JSON.parse(plan.files['settings.json']),cache=JSON.parse(plan.files['usage-cache.json']),replace=value=>{for(const [from,to] of pairs){const relative=path.relative(from,value);if(relative===''||(!relative.startsWith('..')&&!path.isAbsolute(relative)))return path.join(to,relative);}return value;};
- settingsFile.claudeRoots=(settingsFile.claudeRoots||[]).map(root=>mappings[root]||root);settingsFile.codexRoots=(settingsFile.codexRoots||[]).map(root=>mappings[root]||root);
+ settingsFile.claudeRoots=(settingsFile.claudeRoots||[]).map(root=>mappings[root]||root);settingsFile.codexRoots=(settingsFile.codexRoots||[]).map(root=>mappings[root]||root);settingsFile.coworkRoots=(settingsFile.coworkRoots||[]).map(root=>mappings[root]||root);
  settingsFile.hermesRoots=(settingsFile.hermesRoots||[]).map(root=>mappings[root]||root);
  cache.files=Object.fromEntries(Object.entries(cache.files||{}).map(([file,state])=>{const nextFile=replace(file);return [nextFile,{...state,file:nextFile}];}));
  cache.hermesSources=Object.fromEntries(Object.entries(cache.hermesSources||{}).map(([root,source])=>{
@@ -120,7 +126,7 @@ const server=http.createServer(async(req,res)=>{
     try{
      if(store.pending)await store.pending;await store.persist();const cacheFile=path.join(dataDir,'usage-cache.json');previousCache=await fs.readFile(cacheFile);
      const fallback=await createBackup(dataDir,{settings,sessionCount:store.snapshot(settings,{compact:true}).sessions.length}),backupDir=path.join(dataRoot,'recovery');await fs.mkdir(backupDir,{recursive:true});const fallbackFile=path.join(backupDir,`before-cache-reset-${new Date().toISOString().replaceAll(':','-')}.json.gz`);await fs.writeFile(fallbackFile,fallback.buffer);
-     const replacement=new Store(cacheFile,priceHistory),snapshot=await replacement.scan(settings,{compact:true});store=replacement;return json(200,{ok:true,fallbackFile,snapshot});
+     const replacement=new Store(cacheFile,priceHistory,storeOptions),snapshot=await replacement.scan(settings,{compact:true});store=replacement;return json(200,{ok:true,fallbackFile,snapshot});
     }catch(error){if(previousCache)try{const cacheFile=path.join(dataDir,'usage-cache.json'),rollback=cacheFile+'.reset-rollback';await fs.writeFile(rollback,previousCache);await fs.rename(rollback,cacheFile);}catch(rollbackError){error.message+=` · Cache-Rollback fehlgeschlagen: ${rollbackError.code||rollbackError.message}`;}throw error;}finally{mutating=false;}
    }
    if(url.pathname==='/api/backup/export'){
@@ -157,10 +163,12 @@ const server=http.createServer(async(req,res)=>{
      store.repos.clear();return json(200,{settings,priceHistory:priceHistory.status(),rates:effectiveRates(settings.prices)});
     }finally {mutating=false;}
    }
-   if(url.pathname==='/api/shutdown') {json(200,{ok:true});server.close();setTimeout(()=>process.exit(0),300).unref();return;}
+   if(url.pathname==='/api/shutdown') {json(200,{ok:true});server.close();await flushAndExit();return;}
   }
   json(404,{error:'Nicht gefunden.'});
  }catch(e){console.error(e.message);if(!res.headersSent)json(e.statusCode||400,{error:e.message});else res.end();}
 });
+async function flushAndExit(){try{await store.flush();}catch(e){console.error(e.message);}setTimeout(()=>process.exit(0),300).unref();}
+for(const signal of ['SIGINT','SIGTERM','SIGHUP'])process.once(signal,()=>{flushAndExit();});
 server.on('error',e=>{console.error(e.code==='EADDRINUSE'?`Port ${port} ist belegt. Starte über ${process.platform==='linux'?'sh Start.sh':'Start.cmd'} oder setze ATLAS_PORT.`:e.message);process.exitCode=1;});
 server.listen(port,bindHost,()=>{console.log(`Session Atlas: ${origin}`);if(process.argv.includes('--open'))openBrowser(origin).catch(e=>console.error(e.message));});

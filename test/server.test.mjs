@@ -12,7 +12,7 @@ import {parseBackup} from '../lib/backup.mjs';
 
 test('HTTP API is local, rejects foreign origins/mutations, validates settings and shuts down',async t=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'session-atlas-http-'));
- await fs.writeFile(path.join(dir,'settings.json'),JSON.stringify({intervalSeconds:30,claudeRoots:[],codexRoots:[],hermesRoots:[],prices:{}}));
+ await fs.writeFile(path.join(dir,'settings.json'),JSON.stringify({intervalSeconds:30,claudeRoots:[],codexRoots:[],coworkRoots:[],hermesRoots:[],prices:{}}));
  const reserve=net.createServer();reserve.listen(0,'127.0.0.1');await once(reserve,'listening');const port=reserve.address().port;await new Promise(r=>reserve.close(r));
  const child=spawn(process.execPath,['server.mjs'],{cwd:process.cwd(),env:{...process.env,ATLAS_PORT:String(port),ATLAS_DATA_DIR:dir},windowsHide:true,stdio:['ignore','pipe','pipe']});
  t.after(async()=>{if(child.exitCode===null){child.kill();await once(child,'exit');}if(path.dirname(dir)!==os.tmpdir()||!path.basename(dir).startsWith('session-atlas-http-'))throw Error('Unexpected cleanup path');await fs.rm(dir,{recursive:true,force:true});});
@@ -85,7 +85,7 @@ test('launcher reuses an existing server at the configured address', {skip:proce
 test('a fresh installation exports and restores backups without saving settings first',async t=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'session-atlas-first-use-'));
  const reserve=net.createServer();reserve.listen(0,'127.0.0.1');await once(reserve,'listening');const port=reserve.address().port;await new Promise(r=>reserve.close(r));
- const child=spawn(process.execPath,['server.mjs'],{cwd:process.cwd(),env:{...process.env,ATLAS_HOST:'127.0.0.1',ATLAS_PORT:String(port),ATLAS_DATA_DIR:dir,CLAUDE_CONFIG_DIR:path.join(dir,'claude'),CODEX_HOME:path.join(dir,'codex'),HERMES_HOME:path.join(dir,'hermes')},windowsHide:true,stdio:['ignore','pipe','pipe']});
+ const child=spawn(process.execPath,['server.mjs'],{cwd:process.cwd(),env:{...process.env,ATLAS_HOST:'127.0.0.1',ATLAS_PORT:String(port),ATLAS_DATA_DIR:dir,CLAUDE_CONFIG_DIR:path.join(dir,'claude'),CODEX_HOME:path.join(dir,'codex'),HERMES_HOME:path.join(dir,'hermes'),APPDATA:path.join(dir,'appdata'),XDG_CONFIG_HOME:path.join(dir,'xdg'),HOME:dir},windowsHide:true,stdio:['ignore','pipe','pipe']});
  t.after(async()=>{if(child.exitCode===null){child.kill();await once(child,'exit');}await fs.rm(dir,{recursive:true,force:true});});
  await once(child.stdout,'data');const base=`http://127.0.0.1:${port}`,bootstrap=await(await fetch(base+'/api/bootstrap')).json();
  const headers={'X-Atlas-Token':bootstrap.token},post=(endpoint,input={})=>fetch(base+endpoint,{method:'POST',headers,body:JSON.stringify(input)});

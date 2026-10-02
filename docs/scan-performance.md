@@ -17,6 +17,21 @@ The optimized scanner:
 
 The full SHA-256 verification of the already-read prefix of changed files remains in place. No sampling is used. Verification and reading use the same file handle. Newly imported file states also store `ctime`, the file identifier, and the device and include them when detecting unchanged files. Existing version 3 caches remain readable; missing additional metadata is added on the next file import.
 
+## Follow-up: October 2, 2026
+
+Measured with a copy of a real cache (387 sessions, 12,794 responses, 907 MB Codex logs, read-only) and a growing synthetic Claude file; median of seven refreshes including scan, snapshot and response serialization:
+
+| Scenario | Before | After |
+| --- | ---: | ---: |
+| Refresh without changes | 28 ms | 28 ms |
+| Refresh with one appended response | 110 ms | 41 ms |
+| Cache size | 20.6 MB | 13.5 MB |
+
+- Codex `token_count` deltas are no longer persisted once a file has response records, and per-file limit observations are no longer stored because every observation already enters the limit history.
+- The server writes the cache for pure log progress at most every two minutes and on exit (`persistIntervalMs`); limit history, notifications and metadata without a log source are written immediately. `Store` itself defaults to immediate writes.
+- Parser versions are tracked per tool, so a Claude parser change re-reads only Claude logs.
+- Cross-file Claude deduplication uses an index updated only for response keys that appear or disappear in a changed file; a refresh never walks all Claude events. In the synthetic benchmark below, appends stay at the previous level even with immediate writes; only the one-time initial import builds the index.
+
 ## Benchmark
 
 Synthetic data: 193 JSONL files, 16,384 events, approximately 30.7 MiB. For the append case, one file of approximately 9.2 MiB grows by one event. The benchmark ran on Windows in the same working environment with the previous and optimized implementations; the execution order alternated between runs.

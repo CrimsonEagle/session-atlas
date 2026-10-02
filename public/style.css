@@ -173,6 +173,23 @@ dialog{box-shadow:0 25px 100px var(--shadow);overflow:auto}
 .session-tree-row.is-collapsed td.numeric strong{color:var(--atlas-indigo)}
 .session-tree-row td.numeric .row-subtitle{max-width:none}
 .tasks-panel{overflow:hidden}
+/* Fixed layouts give text the full column and truncate only at its edge; numeric columns keep
+   their width and the session and repository columns share the rest. */
+.data-table{table-layout:fixed;min-width:1100px}
+.data-table th,.data-table td{padding-left:16px;padding-right:16px}
+.data-table th:first-child,.data-table td:first-child{padding-left:22px}
+.data-table th:last-child,.data-table td:last-child{padding-right:22px}
+.data-table th:nth-child(2){width:142px}
+.data-table th:nth-child(3){width:18%}
+.data-table th:nth-child(4){width:120px}
+.data-table th:nth-child(5){width:108px}
+.data-table th:nth-child(6){width:164px}
+.data-table .session-cell,.task-table .session-cell{max-width:none}
+.data-table .row-button,.task-table .row-button{display:block;min-width:0;max-width:100%}
+.data-table .row-title,.data-table .row-subtitle,.data-table .repo-name,.task-table .row-title,.task-table .row-subtitle,.task-table .repo-name{max-width:100%}
+.row-title:has(>.row-title-text){display:flex;align-items:center;min-width:0}
+.row-title-text{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.row-title>.active-pill{flex:none;line-height:1.2}
 .task-table{table-layout:fixed;min-width:850px}
 .task-table th:nth-child(1){width:38%}
 .task-table th:nth-child(2){width:16%}

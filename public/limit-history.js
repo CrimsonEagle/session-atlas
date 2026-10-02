@@ -1,7 +1,7 @@
 import {sortableHeader,sortRows,tipAttr,tipLabel} from './charts.js';
 
 const label=minutes=>minutes===300?'5 Stunden':minutes===10080?'Wöchentlich':`${minutes} Minuten`;
-const source=value=>value==='hermes-usage'?'Hermes-Usage-API':value==='statusline'?'Statusline-Bridge':value==='config'?'Claude-Konfiguration':'Session-Log';
+const source=value=>value==='hermes-usage'?'Hermes-Usage-API':value==='statusline'?'Statusline-Bridge':value==='cowork'?'Claude Cowork':value==='config'?'Claude-Konfiguration':'Session-Log';
 const dayValue=value=>{const date=new Date(value);return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;};
 const localDay=value=>{const parsed=new Date(`${value}T00:00:00`);return Number.isFinite(parsed.getTime())?parsed.getTime():null;};
 
