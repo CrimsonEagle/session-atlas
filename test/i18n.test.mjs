@@ -23,6 +23,7 @@ test('language preference defaults to system and explicit choices persist',()=>{
 
 test('translation covers static labels and dynamic usage sentences',()=>{
  assert.equal(translateGerman('Übersicht'),'Overview');
+ assert.equal(translateGerman('2 Gesprächsabschnitte · komprimiert'),'2 conversation segments · compacted');
  assert.equal(translateGerman('Letzte 30 Tage'),'Last 30 days');
  assert.equal(translateGerman('Letzte 3 Monate'),'Last 3 months');
  assert.equal(translateGerman('Eigen: 12.345'),'Own: 12.345');

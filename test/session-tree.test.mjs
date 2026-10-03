@@ -37,6 +37,16 @@ test('session tree starts collapsed and opening any level keeps descendant total
  }
 });
 
+test('compressed Hermes conversations show segment counts separately from actual worker counts',()=>{
+ const root={...session('chat','',100),id:'hermes:chat',tool:'hermes',segmentIds:['chat','tip']},child={...session('worker','chat',40),id:'hermes:worker',tool:'hermes'};
+ const rows=sessionTreeRows([root,child],[root,child]);
+ const html=sessionRow(rows[0],helpers);
+ assert.match(html,/2 Gesprächsabschnitte · komprimiert/);
+ assert.match(html,/1 Sub-Session · Summe/);
+ assert.equal(rows[0].displayTotals.tokens,140);
+ assert.doesNotMatch(sessionRow({...rows[0],segmentIds:['chat']},helpers),/Gesprächsabschnitte/);
+});
+
 test('filtered descendants retain a zero-value context parent and sum only selected usage',()=>{
  const root=session('root','',100),child=session('child','root',40),grandchild=session('grandchild','child',10);
  const rows=sessionTreeRows([grandchild],[root,child,grandchild]);

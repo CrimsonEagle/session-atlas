@@ -202,6 +202,7 @@ const phrases={
  'Nach Branch':'By branch',
  'Hauptsessions / Subagents':'Main sessions / subagents',
  'Verknüpfte Session':'Linked session',
+ 'Gesprächsabschnitte · komprimiert':'conversation segments · compacted',
  'Letzte Aktivität':'Latest activity',
  'Meiste Tokens':'Most tokens',
  'Höchste Kosten':'Highest cost',
