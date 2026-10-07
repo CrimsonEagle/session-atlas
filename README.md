@@ -67,6 +67,22 @@ Linux:
 
 If you already have a status-line command, put it after the bridge with `--` so it still receives the original input; `--quiet` runs the bridge without producing status-line output. The bridge stores only limit measurements. **Settings → Keep Claude Limits Current** shows its expected path and status. Measurements recorded by the bridge can be imported when Atlas next runs.
 
+### Headless Claude runs (`claude -p`)
+
+Headless runs never render a status line, so the bridge above never sees them. With `--output-format stream-json --verbose`, however, the official CLI prints a `rate_limit_event` with the current five-hour and weekly utilization. `bridge/atlas-claude.mjs` runs the CLI and copies only these numbers into Atlas' files. Put it in front of the command your script or launcher already runs and pass the **absolute path of the official `claude` binary** after `--`:
+
+```sh
+node /home/you/Session-Atlas/bridge/atlas-claude.mjs -- /home/you/.local/bin/claude -p "…" --output-format stream-json --verbose
+```
+
+- The wrapper never adds, removes, or rewrites flags. Limits are only read when the caller asks for `stream-json` output; otherwise it is a plain pass-through.
+- stdin, stderr, stdout, and the exit status are the CLI's own; stdout is forwarded byte for byte. SIGTERM, SIGINT, and SIGHUP are forwarded to the CLI, and a CLI killed by a signal ends the wrapper with the same signal. A missing binary exits with 127, a usage error with 2. Failed runs are never retried.
+- Callers that used to parse a single `--output-format json` object add `--result-json` before `--`: stdout then carries only the final `type: "result"` line (up to 32 MB), while the limits are still collected from the stream. A run that exits successfully without a result line fails with exit code 1 instead of producing a made-up result.
+- A reading with both windows replaces `session-atlas-cli-limits.json` in the Claude configuration directory (`CLAUDE_CONFIG_DIR` or `~/.claude`). Every changed reading, including single-window warnings, is also queued in `session-atlas-limit-inbox` for the limit history; a single window never overwrites the current pair. `ATLAS_CLI_LIMIT_FILE` and `ATLAS_RATE_LIMIT_INBOX` override both locations.
+- Only utilization and reset time per window are stored, in private files (mode 0600); prompts, output, session and account details are discarded. Atlas shows these readings as **Claude CLI (headless)**. Nothing is requested from Anthropic beyond the run itself, and no credentials are read. If the files cannot be written, the run continues unaffected.
+
+For launchers that run Claude with a timeout, start the wrapper in its own process group and terminate the whole group, so the CLI cannot outlive the wrapper.
+
 ### Hermes Codex subscription limit collector (Linux)
 
 With Hermes's OpenAI-Codex login available to your user, run this **once** from the Atlas folder (no sudo):

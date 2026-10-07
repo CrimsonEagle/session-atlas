@@ -233,3 +233,28 @@ test('missing prices do not change the appearance of cost-chart markers',()=>{
  assert.doesNotMatch(css,/\.limit-cost-point\.incomplete\b/);
  assert.doesNotMatch(css,/\.limit-cost-series\.raw \.limit-cost-point\.incomplete\b/);
 });
+
+test('headless CLI readings are labelled as such, not as a status line or session log',()=>{
+ const history=[{id:'cli',tool:'claude',windowMinutes:300,resetsAt:'2026-09-15T15:00:00Z',usedPercent:27,sourceObservedAt:'2026-09-15T11:00:00Z',source:'claude-cli'}];
+ const html=limitHistoryView({history,tool:'claude',now,esc:String,date:String});
+ assert.match(html,/Claude-Code-CLI/);
+ assert.doesNotMatch(html,/Statusline-Bridge|Session-Log/);
+});
+
+test('unknown or unrepresentable resets stay unknown instead of becoming 1970 or throwing',async()=>{
+ const {normalizeCli}=await import('../lib/claude-limits.mjs');
+ const cli=normalizeCli({version:1,source:'claude-cli',observedAtMs:now,rate_limits:{five_hour:{utilization:.27,resetsAt:null}}});
+ const result=updateLimitHistory([cli],[],{},{now});
+ assert.equal(result.history.length,1);
+ assert.equal(result.history[0].resetsAt,null);
+ assert.match(result.history[0].id,/\|inferred-/);
+ for(const resets_at of [null,undefined,'',0,-1,1e100,Infinity]) {
+  const point=updateLimitHistory([{limit_id:'codex',observedAt:'2026-09-15T12:00:00Z',primary:{window_minutes:300,used_percent:20,resets_at}}],[],{},{now}).history[0];
+  assert.equal(point.resetsAt,null,`resets_at ${String(resets_at)}`);
+ }
+ // An unknown reset falls back to the inferred window, so thresholds alert once per window.
+ const high=updateLimitHistory([{...cli,primary:{...cli.primary,used_percent:85}}],[],{},{now});
+ assert.equal(high.alerts.length,1);assert.equal(high.alerts[0].threshold,80);
+ const repeat=updateLimitHistory([{...cli,observedAt:new Date(now+60000).toISOString(),primary:{...cli.primary,used_percent:86}}],high.history,high.notified,{now:now+60000});
+ assert.equal(repeat.alerts.length,0);
+});
