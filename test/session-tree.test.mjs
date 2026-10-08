@@ -106,3 +106,13 @@ test('unassigned sessions join the same top-level numeric order',()=>{
  unassigned.relationType='ambiguous';
  assert.deepEqual(sessionTreeRows([root,unassigned],[root,unassigned],new Set(),'tokens','desc').map(row=>row.sessionId),['unassigned','root']);
 });
+
+test('session row shows branch and models together',()=>{
+ const row=sessionTreeRows([session('a')],[session('a')])[0];
+ const models=html=>html.match(/<span class="repo-name"[^>]*>[^<]*<\/span><span class="row-subtitle"[^>]*>([^<]*)</)[1];
+ const events=[{...row.events[0],model:'claude-opus-5-5'},{...row.events[0],model:'claude-haiku-4-5'},{...row.events[0],model:'claude-opus-5-5'}];
+ assert.equal(models(sessionRow({...row,branch:'main',events},helpers)),'main · claude-opus-5-5, claude-haiku-4-5');
+ assert.equal(models(sessionRow({...row,branch:'',events},helpers)),'claude-opus-5-5, claude-haiku-4-5');
+ assert.equal(models(sessionRow({...row,branch:'main',events:[]},helpers)),'main');
+ assert.equal(models(sessionRow({...row,branch:'',events:[]},helpers)),'Keine Nutzungsdaten protokolliert');
+});
