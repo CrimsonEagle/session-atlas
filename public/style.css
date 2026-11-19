@@ -54,8 +54,10 @@ dialog{box-shadow:0 25px 100px var(--shadow);overflow:auto}
 .aggregate-row-button{min-width:180px;cursor:pointer}
 .row-button:focus-visible .row-title,.row-button:hover .row-title{color:var(--blue)}
 .price-notice{display:flex;align-items:center;justify-content:space-between;gap:18px}
+.notice-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .notice-action{flex-shrink:0;border:1px solid currentColor;border-radius:7px;padding:7px 10px;background:transparent;color:inherit;font-size:11px;font-weight:600}
 .notice-action:hover{background:#ffffff18}
+.notice-action:disabled{opacity:.6;cursor:default}
 .detail-intro{font-size:12px;margin:0 0 18px;max-width:680px}
 .unknown-models-table{margin-top:0}
 .detail-summary{margin-top:15px;color:var(--muted);font-size:11px}
@@ -131,7 +133,7 @@ dialog{box-shadow:0 25px 100px var(--shadow);overflow:auto}
 .breakdown i:hover{filter:brightness(1.12)}
 .breakdown-labels span{display:inline-flex;align-items:center;gap:7px}
 .insight-row:hover{background:var(--surface-hover)}
-@media(max-width:620px){.theme-control{gap:0}.theme-choice-text{display:none}.theme-options button{width:29px;padding:5px;justify-content:center}.price-notice,.price-help-row{align-items:flex-start;flex-direction:column;gap:10px}.notice-action,.info-button{width:100%;justify-content:center}.price-format-list li{grid-template-columns:28px 1fr;gap:5px 10px}.price-format-list li span{grid-column:2}.limits-panel{display:block}.limits-panel .limit-group+.limit-group{border-top:1px solid var(--line);padding-top:20px;margin-top:22px}}
+@media(max-width:620px){.theme-control{gap:0}.theme-choice-text{display:none}.theme-options button{width:29px;padding:5px;justify-content:center}.price-notice,.price-help-row{align-items:flex-start;flex-direction:column;gap:10px}.notice-actions{width:100%;flex-direction:column}.notice-action,.info-button{width:100%;justify-content:center}.price-format-list li{grid-template-columns:28px 1fr;gap:5px 10px}.price-format-list li span{grid-column:2}.limits-panel{display:block}.limits-panel .limit-group+.limit-group{border-top:1px solid var(--line);padding-top:20px;margin-top:22px}}
 
 /* Period comparison: the dashed mauve trace is the one deliberate new visual signature. */
 .model-filter{max-width:210px}.filter-reset{min-height:41px}.filter-reset:disabled{cursor:default}.compare-toggle.active{color:var(--blue);border-color:#9fb0ef;background:var(--surface-active)}
