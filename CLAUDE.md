@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Session Atlas: a local, offline web app that shows token usage, API-equivalent costs, and subscription limits for Claude Code (incl. Claude Desktop Cowork), OpenAI Codex, and Hermes Agent (incl. OpenRouter spending). It needs Node.js >= 22.13 and has **no dependencies, no `npm install`, and no build step**. It uses only Node built-ins on the server and plain ES modules in the browser. Vendored libraries live in `public/vendor/` (PixiJS).
+Session Atlas: a local, offline web app that shows token usage, API-equivalent costs, and subscription limits for Claude Code (incl. Claude Desktop Cowork), OpenAI Codex, Hermes Agent (incl. OpenRouter spending), and Google Antigravity. It needs Node.js >= 22.13 and has **no dependencies, no `npm install`, and no build step**. It uses only Node built-ins on the server and plain ES modules in the browser. Vendored libraries live in `public/vendor/` (PixiJS).
 
 ## Commands
 
@@ -15,7 +15,7 @@ Session Atlas: a local, offline web app that shows token usage, API-equivalent c
 - `npm run package`: build `dist/Session-Atlas-portable.zip` from an explicit allowlist in `scripts/package.mjs`. **Add new top-level files or folders that must ship to that list.**
 - `node scripts/benchmark-scan.mjs`: run the synthetic scan benchmark (see `docs/scan-performance.md`).
 
-Env vars: `ATLAS_PORT`, `ATLAS_HOST` (a specific IPv4 address; `0.0.0.0` is rejected), `ATLAS_DATA_DIR` (default `.local/`), `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `HERMES_HOME`.
+Env vars: `ATLAS_PORT`, `ATLAS_HOST` (a specific IPv4 address; `0.0.0.0` is rejected), `ATLAS_DATA_DIR` (default `.local/`), `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `HERMES_HOME`, `ANTIGRAVITY_HOME`.
 
 ## Architecture
 
@@ -28,7 +28,7 @@ Env vars: `ATLAS_PORT`, `ATLAS_HOST` (a specific IPv4 address; `0.0.0.0` is reje
 - The cache format version lives in `Store.load`/`persist` (currently 7). `load` also accepts the older versions it lists.
 - Claude responses are deduplicated across files by message ID. The earliest session owns a repeated response, tracked through an incremental index (`claudeEventFiles`/`claudeDuplicates`).
 - The server persists pure log progress at most every 2 minutes (`persistIntervalMs`) and on shutdown. Limit and metadata changes are written immediately.
-- Other sources: `hermes-local.mjs` (Hermes SQLite `state.db`, read-only), `hermes-conversations.mjs` (derived projection that merges compression segments into one conversation and keeps resets separate; raw cache counters and event IDs stay untouched), `cowork.mjs` (Claude Desktop Cowork transcripts and `audit.jsonl` rate-limit events), `claude-limits.mjs` (`~/.claude.json` and the status-line bridge files), `limit-history.mjs`, `session-names.mjs`.
+- Other sources: `hermes-local.mjs` (Hermes SQLite `state.db`, read-only), `hermes-conversations.mjs` (derived projection that merges compression segments into one conversation and keeps resets separate; raw cache counters and event IDs stay untouched), `cowork.mjs` (Claude Desktop Cowork transcripts and `audit.jsonl` rate-limit events), `antigravity.mjs` (Google Antigravity `brain/*` transcripts and read-only SQLite/pbtxt metadata), `claude-limits.mjs` (`~/.claude.json` and the status-line bridge files), `limit-history.mjs`, `session-names.mjs`.
 - `Store.snapshot(settings, opts)` builds the payload the UI uses: sessions with priced events, limits, and stats.
 
 **Pricing**: `lib/pricing.mjs` holds bundled USD-per-million-token rates `[input, cachedInput, output, cacheWrite5m?, cacheWrite1h?]`, plus family-wide rules (fast-mode factors, GPT long-context and priority rules). Unknown models stay unpriced; never guess prices. When changing prices or rules, update `priceDate` and **`PRICING_RULE_VERSION`**. At startup, a changed rate table is recorded as a new snapshot in `lib/price-history.mjs`, which powers "historical" pricing mode. Effective rates are `{...bundled, ...remote (price-sync.mjs: LiteLLM/models.dev/OpenRouter), ...user overrides}`.

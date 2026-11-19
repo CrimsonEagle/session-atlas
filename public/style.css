@@ -667,6 +667,13 @@ th{font-size:11px}td{font-size:13px}.row-subtitle{font-size:11px}.table-footer{f
 .dot.hermes{background:var(--hermes)}
 .tool-logo.hermes{background:var(--hermes-soft);color:var(--hermes)}
 .source-card.hermes-source{border-top:2px solid color-mix(in srgb,var(--hermes) 58%,var(--line))}
+:root{--antigravity:#c47d12;--antigravity-soft:#fdf3dc}
+:root[data-theme=dark]{--antigravity:#f4be55;--antigravity-soft:#3d2e14}
+@media(prefers-color-scheme:dark){:root[data-theme=system]{--antigravity:#f4be55;--antigravity-soft:#3d2e14}}
+.metric-note .antigravity{color:var(--antigravity)}
+.dot.antigravity{background:var(--antigravity)}
+.tool-logo.antigravity{background:var(--antigravity-soft);color:var(--antigravity)}
+.source-card.antigravity-source{border-top:2px solid color-mix(in srgb,var(--antigravity) 58%,var(--line))}
 
 /* At most two provider cards flank the chart; remaining cards get their own tiles below. */
 .dashboard-grid{grid-template-columns:minmax(0,1fr) minmax(300px,340px);gap:16px;align-items:stretch}
@@ -681,6 +688,7 @@ th{font-size:11px}td{font-size:13px}.row-subtitle{font-size:11px}.table-footer{f
 .provider-below{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:16px;min-width:0}
 .dashboard-grid .provider-card{display:flex;flex-direction:column;min-width:0;padding:18px 20px;border-top:3px solid var(--atlas-violet)}
 .dashboard-grid .billing-card{border-top-color:var(--atlas-cyan)}
+.dashboard-grid .provider-card[data-provider-card=antigravity]{border-top-color:var(--antigravity)}
 .provider-card-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:5px 10px}
 .provider-card-header h3{min-width:0;margin:0;font-size:13px;font-weight:650}
 .provider-card-header .tool-tag{font-size:13px}

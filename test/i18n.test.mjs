@@ -35,6 +35,7 @@ test('translation covers static labels and dynamic usage sentences',()=>{
  assert.equal(translateGerman('Unbekannter Ordner'),'Unknown folder');
  assert.equal(translateGerman('Linux-Autostart'),'Linux startup');
  assert.equal(translateGerman('App beendet. Zum Starten sh Start.sh ausführen.'),'App stopped. Run sh Start.sh to start it again.');
+ assert.equal(translateGerman('Standard sind deine .gemini/antigravity-cli- und .gemini/antigravity-Ordner. Atlas liest die Session-Transkripte unter brain sowie Titel, Projektpfade und Subagent-Beziehungen aus den lokalen Metadaten.'),'The defaults are your .gemini/antigravity-cli and .gemini/antigravity folders. Atlas reads session transcripts under brain as well as titles, project paths, and subagent relationships from local metadata.');
 });
 
 test('overview separates subscription usage and recorded provider spending in English',()=>{

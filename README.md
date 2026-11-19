@@ -1,6 +1,6 @@
 # Session Atlas
 
-Session Atlas shows local usage for **Claude Code, OpenAI Codex, and Hermes Agent** on **Windows and Linux**. Run it on the computer that holds the session data. Analytics work offline; only a manual price update needs internet access. Requires **Node.js 22.13 or newer** and a current browser. No `npm install`, API key, or build step is needed.
+Session Atlas shows local usage for **Claude Code, OpenAI Codex, Hermes Agent, and Google Antigravity** on **Windows and Linux**. Run it on the computer that holds the session data. Analytics work offline; only a manual price update needs internet access. Requires **Node.js 22.13 or newer** and a current browser. No `npm install`, API key, or build step is needed.
 
 ## Start
 
@@ -25,7 +25,7 @@ Closing the browser tab leaves the idle server running. Use **Exit App Completel
 
 | Setting | What to know |
 | --- | --- |
-| **Data Sources** | Default local folders are scanned automatically. Add other absolute folders, including accessible UNC or WSL paths on Windows. `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, and `HERMES_HOME` change the respective default roots. |
+| **Data Sources** | Default local folders are scanned automatically. Add other absolute folders, including accessible UNC or WSL paths on Windows. `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `HERMES_HOME`, and `ANTIGRAVITY_HOME` change the respective default roots. |
 | **Automatic Scanning** | Defaults to 30 seconds; choose 10–3,600 seconds. Scanning pauses when the app is out of focus and refreshes when you return. You can also refresh manually. |
 | **Visible Providers** | Per provider: hiding an AI tool removes its usage data, chart series, filters, and limit card; hiding OpenRouter hides only its recorded-spending card while totals and usage data stay unchanged. Saved with the settings. |
 | **Limit Notifications** | Thresholds default to 80% and 95%, with at most one notification per threshold and reset window. Limit history is kept for 90 days by default. |
@@ -45,6 +45,7 @@ Closing the browser tab leaves the idle server running. Use **Exit App Completel
 | Claude Cowork (Claude Desktop) | `local-agent-mode-sessions` in Claude Desktop's data folder (`%APPDATA%\Claude` on Windows, `~/Library/Application Support/Claude` on macOS, `~/.config/Claude` on Linux): task transcripts count as Claude Code sessions, titles come from the task metadata, and `rate_limit_event` entries in `audit.jsonl` provide account-wide Claude limit readings. Only limit values, titles, and transcript IDs are taken from these files; uploads, outputs, mounted folders, and plugin caches are not read |
 | Codex | `~/.codex/sessions`, `~/.codex/archived_sessions`, and the read-only `state_*.sqlite` metadata database |
 | Hermes Agent | `~/.hermes/state.db` and profile databases under `~/.hermes/profiles` on Linux; `%LOCALAPPDATA%/hermes` by default on Windows |
+| Google Antigravity | `~/.gemini/antigravity-cli` and `~/.gemini/antigravity`: session transcripts under `brain/<id>/.system_generated/logs/transcript.jsonl`, plus titles, workspace paths, and parent/subagent links from `conversation_summaries.db`, `annotations/*.pbtxt`, `cache/last_conversations.json`, `history.jsonl`, and `conversations/*.db` |
 | OpenRouter | No separate files: spending comes from the billing provider recorded in Hermes sessions; model prices come from the public OpenRouter models endpoint during a manual price update |
 
 `~` is the current user's home directory. Session logs and source databases are read-only. Atlas discards prompt and response text while parsing and does not access credentials. Its local cache stores usage, session metadata, and limit history under `.local/states/<id>/`. While logs only grow, the cache is rewritten at most every two minutes and on exit; limit changes are saved immediately, and any unsaved log progress is simply read again after an unexpected stop. Browser data is not collected. A backup preserves the imported history even if the original logs are no longer available.
