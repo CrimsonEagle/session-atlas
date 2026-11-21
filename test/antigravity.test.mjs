@@ -11,9 +11,12 @@ import {createBackup,parseBackup} from '../lib/backup.mjs';
 test('defaultAntigravityRoots, antigravitySessionId and uriToPath normalize paths across platforms',()=>{
  assert.deepEqual(defaultAntigravityRoots({ANTIGRAVITY_HOME:path.join(os.tmpdir(),'custom-agy')},'/ignored'),[path.resolve(path.join(os.tmpdir(),'custom-agy'))]);
  const defaults=defaultAntigravityRoots({},'/home/alice');
- assert.equal(defaults.length,2);
+ assert.equal(defaults.length,3);
  assert.ok(defaults[0].endsWith(path.join('.gemini','antigravity-cli')));
  assert.ok(defaults[1].endsWith(path.join('.gemini','antigravity')));
+ assert.ok(defaults[2].endsWith(path.join('.t3','userdata','providers','antigravity')));
+ const customT3=defaultAntigravityRoots({T3CODE_HOME:path.join(os.tmpdir(),'custom-t3')},'/home/alice');
+ assert.equal(customT3[2],path.resolve(path.join(os.tmpdir(),'custom-t3'),'userdata','providers','antigravity'));
  assert.equal(antigravitySessionId('/home/alice/.gemini/antigravity-cli/brain/24ffe499-af1b-414c-b804-48aba2d65e46/.system_generated/logs/transcript.jsonl'),'24ffe499-af1b-414c-b804-48aba2d65e46');
  assert.equal(antigravitySessionId('C:\\Users\\Marco\\.gemini\\antigravity\\brain\\conv-123\\transcript.jsonl'),'conv-123');
  assert.equal(uriToPath('file:///C:/AI/ai-usage-visualizer'),path.win32.normalize('C:/AI/ai-usage-visualizer'));
@@ -196,4 +199,51 @@ test('Antigravity transcripts normalize effort-suffixed Gemini model ids and pri
   ['gemini-4-hydrogen','high']
  ]);
  for(const ev of session.events)assert.ok(ev.cost>0);
+});
+
+test('Store discovers T3 Code antigravity-acp profiles, metadata, and swarm worker agent names',async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'atlas-agy-t3-'));
+ t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+ const providersRoot=path.join(dir,'providers','antigravity');
+ const acpHome=path.join(providersRoot,'ac0a3dfd6ddd','antigravity-acp');
+ const repo=path.join(dir,'better-taskmanager');
+ await fs.mkdir(path.join(repo,'.git'),{recursive:true});
+ const coordLogs=path.join(acpHome,'brain','coord-1','.system_generated','logs');
+ const workerLogs=path.join(acpHome,'brain','worker-1','.system_generated','logs');
+ await fs.mkdir(coordLogs,{recursive:true});
+ await fs.mkdir(workerLogs,{recursive:true});
+ await fs.writeFile(path.join(coordLogs,'transcript.jsonl'),[
+  {step_index:0,source:'USER_EXPLICIT',type:'USER_INPUT',status:'DONE',created_at:'2026-11-20T15:55:00Z',content:'<USER_REQUEST>\nAnalyze project\n</USER_REQUEST>'},
+  {step_index:1,source:'MODEL',type:'PLANNER_RESPONSE',status:'DONE',created_at:'2026-11-20T15:55:10Z',model:'gemini-4-neon-medium',input_tokens:30000,cache_read_tokens:0,output_tokens:500}
+ ].map(x=>JSON.stringify(x)).join('\n')+'\n');
+ await fs.writeFile(path.join(workerLogs,'transcript.jsonl'),[
+  {step_index:0,source:'USER_EXPLICIT',type:'USER_INPUT',status:'DONE',created_at:'2026-11-20T15:56:00Z',content:'<USER_REQUEST>\nVery long swarm briefing text that should be overridden by agent_name\n</USER_REQUEST>'},
+  {step_index:1,source:'MODEL',type:'PLANNER_RESPONSE',status:'DONE',created_at:'2026-11-20T15:56:10Z',model:'gemini-4-neon-high',input_tokens:12000,cache_read_tokens:8000,output_tokens:400}
+ ].map(x=>JSON.stringify(x)).join('\n')+'\n');
+
+ const repoUri='file:///'+(repo.replaceAll('\\','/').replace(/^\/+/,''));
+ const db=new DatabaseSync(path.join(acpHome,'conversation_summaries.db'));
+ db.exec('CREATE TABLE conversation_summaries (conversation_id TEXT PRIMARY KEY, title TEXT, preview TEXT, workspace_uris TEXT, parent_conversation_id TEXT, agent_name TEXT)');
+ db.prepare('INSERT INTO conversation_summaries VALUES (?, ?, ?, ?, ?, ?)').run('coord-1','Task Manager Swarm Analysis','Task Manager Swarm Analysis',JSON.stringify([repoUri]),'','');
+ db.prepare('INSERT INTO conversation_summaries VALUES (?, ?, ?, ?, ?, ?)').run('worker-1','','',JSON.stringify([repoUri]),'coord-1','backend-analyst');
+ db.close();
+
+ const store=new Store(path.join(dir,'usage-cache.json'));
+ const snapshot=await store.scan({claudeRoots:[],codexRoots:[],coworkRoots:[],hermesRoots:[],antigravityRoots:[providersRoot],prices:{}});
+ assert.equal(snapshot.sessions.length,2);
+ const byId=new Map(snapshot.sessions.map(s=>[s.sessionId,s]));
+ const coord=byId.get('coord-1'),worker=byId.get('worker-1');
+ assert.equal(coord.name,'Task Manager Swarm Analysis');
+ assert.equal(coord.repository,await fs.realpath(repo));
+ assert.equal(coord.events[0].model,'gemini-4-neon');
+ assert.equal(coord.events[0].effort,'medium');
+ assert.ok(coord.events[0].cost>0);
+ assert.equal(worker.name,'backend-analyst');
+ assert.equal(worker.nameSource,'antigravity.summaries.agent_name');
+ assert.equal(worker.parentId,'coord-1');
+ assert.equal(worker.subagent,true);
+ assert.equal(worker.repository,await fs.realpath(repo));
+ assert.equal(worker.events[0].model,'gemini-4-neon');
+ assert.equal(worker.events[0].effort,'high');
+ assert.ok(worker.events[0].cost>0);
 });

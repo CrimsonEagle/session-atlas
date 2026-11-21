@@ -1,7 +1,8 @@
 import {sortableHeader,sortRows,tipAttr,tipLabel} from './charts.js';
+import {antigravityModelMatchesQuota} from './usage-overview.js';
 
 const label=minutes=>minutes===300?'5 Stunden':minutes===10080?'Wöchentlich':`${minutes} Minuten`;
-const source=value=>value==='hermes-usage'?'Hermes-Usage-API':value==='statusline'?'Statusline-Bridge':value==='claude-cli'?'Claude-Code-CLI':value==='cowork'?'Claude Cowork':value==='config'?'Claude-Konfiguration':'Session-Log';
+const source=value=>value==='antigravity-cli'?'Antigravity-CLI':value==='hermes-usage'?'Hermes-Usage-API':value==='statusline'?'Statusline-Bridge':value==='claude-cli'?'Claude-Code-CLI':value==='cowork'?'Claude Cowork':value==='config'?'Claude-Konfiguration':'Session-Log';
 const dayValue=value=>{const date=new Date(value);return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;};
 const localDay=value=>{const parsed=new Date(`${value}T00:00:00`);return Number.isFinite(parsed.getTime())?parsed.getTime():null;};
 
@@ -16,10 +17,11 @@ function selectedRange(period,from,to,now) {
  return {start,end:now};
 }
 
-function filterMarkup({period,from,to,mode,aggregation}) {
+function filterMarkup({period,from,to,mode,aggregation,groups=[],selectedGroup='',esc=String}) {
  const option=(value,text)=>`<option value="${value}"${period===value?' selected':''}>${text}</option>`;
+ const groupControl=groups.length>1?`<label class="limit-group-control"><span>Kontingent</span><select id="limit-history-group">${groups.map(name=>`<option value="${esc(name)}"${name===selectedGroup?' selected':''}>${esc(name)}</option>`).join('')}</select></label>`:'';
  const aggregationControl=mode==='cost'?`<label class="limit-aggregation-control"><span>Punkte</span><select id="limit-history-aggregation"><option value="window"${aggregation==='window'?' selected':''}>Fenstermittel</option><option value="raw"${aggregation==='raw'?' selected':''}>Einzelmessungen</option></select></label>`:'';
- return `<div class="limit-history-toolbar"><div class="segments limit-history-mode" role="group" aria-label="Limitdarstellung"><button type="button" data-limit-history-mode="cost" class="${mode==='cost'?'active':''}" aria-pressed="${mode==='cost'}">Kostenlimit</button><button type="button" data-limit-history-mode="usage" class="${mode==='usage'?'active':''}" aria-pressed="${mode==='usage'}">Auslastung</button></div>${aggregationControl}<label><span>Zeitraum</span><select id="limit-history-period">${option('7','Letzte 7 Tage')}${option('30','Letzte 30 Tage')}${option('90','Letzte 90 Tage')}${option('all','Gesamter Verlauf')}${option('custom','Eigener Zeitraum')}</select></label><div class="limit-history-custom"${period==='custom'?'':' hidden'}><label><span>Von</span><input id="limit-history-from" type="date" value="${from}"></label><label><span>Bis</span><input id="limit-history-to" type="date" value="${to}"></label></div></div>`;
+ return `<div class="limit-history-toolbar"><div class="segments limit-history-mode" role="group" aria-label="Limitdarstellung"><button type="button" data-limit-history-mode="cost" class="${mode==='cost'?'active':''}" aria-pressed="${mode==='cost'}">Kostenlimit</button><button type="button" data-limit-history-mode="usage" class="${mode==='usage'?'active':''}" aria-pressed="${mode==='usage'}">Auslastung</button></div>${groupControl}${aggregationControl}<label><span>Zeitraum</span><select id="limit-history-period">${option('7','Letzte 7 Tage')}${option('30','Letzte 30 Tage')}${option('90','Letzte 90 Tage')}${option('all','Gesamter Verlauf')}${option('custom','Eigener Zeitraum')}</select></label><div class="limit-history-custom"${period==='custom'?'':' hidden'}><label><span>Von</span><input id="limit-history-from" type="date" value="${from}"></label><label><span>Bis</span><input id="limit-history-to" type="date" value="${to}"></label></div></div>`;
 }
 
 function lowerBound(events,time) {
@@ -44,13 +46,26 @@ function roundingLimits(cost,used) {
  * Combine historical utilization samples with locally priced model events. The provider reset is
  * the only reliable window anchor: without it a five-hour or weekly spend cannot be reconstructed.
  */
-export function estimateCostLimits(history=[],sessions=[],tool) {
- const events=sessions.filter(session=>session.tool===tool).flatMap(session=>(session.events||[]).filter(event=>tool!=='hermes'||event.provider==='openai-codex').map(event=>({time:Date.parse(event.time),cost:event.cost}))).filter(event=>Number.isFinite(event.time)).sort((a,b)=>a.time-b.time);
- const prefixCost=[0],prefixUnknown=[0];
- for(const event of events){prefixCost.push(prefixCost.at(-1)+(Number.isFinite(event.cost)?event.cost:0));prefixUnknown.push(prefixUnknown.at(-1)+Number(event.cost===null));}
- return history.filter(point=>point.tool===tool).map(point=>{
+export function estimateCostLimits(history=[],sessions=[],tool,options={}) {
+ const toolPoints=history.filter(point=>point.tool===tool);
+ const rawEvents=sessions.filter(session=>session.tool===tool).flatMap(session=>(session.events||[]).filter(event=>tool!=='hermes'||event.provider==='openai-codex').map(event=>({time:Date.parse(event.time),cost:event.cost,model:event.model}))).filter(event=>Number.isFinite(event.time)).sort((a,b)=>a.time-b.time);
+ const buildIndex=list=>{
+  const prefixCost=[0],prefixUnknown=[0];
+  for(const event of list){prefixCost.push(prefixCost.at(-1)+(Number.isFinite(event.cost)?event.cost:0));prefixUnknown.push(prefixUnknown.at(-1)+Number(event.cost===null));}
+  return {events:list,prefixCost,prefixUnknown};
+ };
+ const defaultIndex=buildIndex(rawEvents),groupIndexes=new Map();
+ const hasSeparateArgon=options.hasSeparateArgon??toolPoints.some(point=>/argon/i.test(point.bucketId||'')||/argon/i.test(point.groupName||''));
+ const indexFor=point=>{
+  if(tool!=='antigravity'||(!point.groupName&&!point.bucketId))return defaultIndex;
+  const key=`${point.groupName||''}|${point.bucketId||''}`;
+  if(!groupIndexes.has(key))groupIndexes.set(key,buildIndex(rawEvents.filter(event=>antigravityModelMatchesQuota(event.model,point.groupName,point.bucketId,{hasSeparateArgon}))));
+  return groupIndexes.get(key);
+ };
+ return toolPoints.map(point=>{
   const observed=Date.parse(point.sourceObservedAt),reset=Date.parse(point.resetsAt),minutes=Number(point.windowMinutes),used=Number(point.usedPercent),start=reset-minutes*60000;
   if(!Number.isFinite(observed)||!Number.isFinite(reset)||!Number.isFinite(minutes)||minutes<=0||reset<=observed||start>observed||!Number.isFinite(used)||used<=0)return {...point,windowCost:null,estimatedLimit:null,unknownCosts:0,requests:0,coverage:null};
+  const {events,prefixCost,prefixUnknown}=indexFor(point);
   const first=lowerBound(events,start),after=lowerBound(events,observed+1),requests=after-first,unknownCosts=prefixUnknown[after]-prefixUnknown[first],windowCost=prefixCost[after]-prefixCost[first],known=requests-unknownCosts;
   const estimatedLimit=known>0&&windowCost>0?windowCost*100/used:null;
   return {...point,windowStart:new Date(start).toISOString(),windowCost,estimatedLimit,...(estimatedLimit===null?{minRoundingLimit:null,maxRoundingLimit:null}:roundingLimits(windowCost,used)),unknownCosts,requests,coverage:requests?known/requests:null};
@@ -163,8 +178,13 @@ function costView({points,allPoints,toolbar,sortKey,sortDirection,esc,date,money
  return `<div class="detail-body limit-history-detail limit-cost-detail">${toolbar}<p class="limit-cost-intro">Geschätzter API-Gegenwert des nutzbaren Kontingents: ${intro}</p>${tool==='hermes'?'<p class="limit-cost-uncertainty">Die Auslastung gilt für das gesamte Codex-Konto; die Hochrechnung nutzt nur lokal erfasste Hermes-Sessions mit Codex-Provider. Nutzung außerhalb von Hermes und ungenaue Zeitpunkte der kumulierten Session-Zähler können den Vergleich verzerren.</p>':''}${costSummary(displayPoints,money,aggregation,locale)}${legendMarkup(visibleWindows,summary)}<p class="limit-cost-uncertainty">${chartExplanation}</p>${costChart(visiblePoints,estimatable,esc,date,money,range,aggregation,locale)}${unknown?`<div class="notice compact-notice">${notice} Diese Werte sind unvollständig und können höher ausfallen.</div>`:''}<div class="table-wrap">${table}</div><p class="detail-footnote">${visiblePoints.length} von ${displayPoints.length} ${averaged?'Fenstermitteln':'Einzelmessungen'} der eingeblendeten Zeitfenster · ${allPoints.length} Messpunkte insgesamt. Die Hochrechnung ist eine lokale Näherung aus API-Preisen, keine Auskunft des Anbieters über ein Geldlimit.</p></div>`;
 }
 
-export function limitHistoryView({history,sessions=[],tool,mode='usage',aggregation='raw',sortKey='observed',sortDirection='desc',period='30',from='',to='',visibleWindows=[300,10080],now=Date.now(),esc=String,date=String,money=value=>`$${Number(value).toFixed(2)}`,locale='de-DE'}) {
- const allPoints=estimateCostLimits(history,sessions,tool).sort((a,b)=>a.sourceObservedAt.localeCompare(b.sourceObservedAt)),range=selectedRange(period,from,to,now),points=allPoints.filter(point=>{const time=Date.parse(point.sourceObservedAt);return (range.start===null||time>=range.start)&&(range.end===null||time<=range.end);}),stride=Math.max(1,Math.ceil(points.length/1000)),chartPoints=points.filter((point,index)=>index%stride===0||index===points.length-1||point.resetsAt!==points[index-1]?.resetsAt||point.resetsAt!==points[index+1]?.resetsAt),toolbar=filterMarkup({period,from:from||dayValue(now-29*86400000),to:to||dayValue(now),mode,aggregation});
+export function limitHistoryView({history,sessions=[],tool,group='',mode='usage',aggregation='raw',sortKey='observed',sortDirection='desc',period='30',from='',to='',visibleWindows=[300,10080],now=Date.now(),esc=String,date=String,money=value=>`$${Number(value).toFixed(2)}`,locale='de-DE'}) {
+ const toolHistory=(history||[]).filter(point=>point.tool===tool);
+ const groups=tool==='antigravity'?[...new Set(toolHistory.map(point=>point.groupName).filter(Boolean))]:[];
+ const selectedGroup=groups.length?(groups.includes(group)?group:(groups.find(name=>toolHistory.some(point=>point.groupName===name&&point.usedPercent>0))||groups[0])):'';
+ const hasSeparateArgon=tool==='antigravity'&&toolHistory.some(point=>/argon/i.test(point.bucketId||'')||/argon/i.test(point.groupName||''));
+ const scopedHistory=selectedGroup?toolHistory.filter(point=>point.groupName===selectedGroup):toolHistory;
+ const allPoints=estimateCostLimits(scopedHistory,sessions,tool,{hasSeparateArgon}).sort((a,b)=>a.sourceObservedAt.localeCompare(b.sourceObservedAt)),range=selectedRange(period,from,to,now),points=allPoints.filter(point=>{const time=Date.parse(point.sourceObservedAt);return (range.start===null||time>=range.start)&&(range.end===null||time<=range.end);}),stride=Math.max(1,Math.ceil(points.length/1000)),chartPoints=points.filter((point,index)=>index%stride===0||index===points.length-1||point.resetsAt!==points[index-1]?.resetsAt||point.resetsAt!==points[index+1]?.resetsAt),toolbar=filterMarkup({period,from:from||dayValue(now-29*86400000),to:to||dayValue(now),mode,aggregation,groups,selectedGroup,esc});
  if(!points.length){const message=allPoints.length?'Im gewählten Zeitraum wurden keine Limitmessungen gespeichert.':'Noch keine Limitmessungen für dieses Tool gespeichert.';return `<div class="detail-body limit-history-detail">${toolbar}<div class="comparison-empty">${message}</div></div>`;}
  const visible=new Set(visibleWindows.map(Number).filter(minutes=>minutes===300||minutes===10080));
  return mode==='usage'?usageView({points,allPoints,chartPoints,toolbar,sortKey,sortDirection,esc,date,range,visibleWindows:visible,locale,tool}):costView({points,allPoints,toolbar,sortKey,sortDirection,esc,date,money,range,aggregation,visibleWindows:visible,locale,tool});

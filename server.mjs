@@ -16,7 +16,8 @@ import {staticAsset} from './lib/static-assets.mjs';
 import {runtimeRevision} from './lib/runtime-revision.mjs';
 import {defaultHermesHome,hermesRootId,validateHermesRoots} from './lib/hermes-local.mjs';
 import {defaultCoworkRoot} from './lib/cowork.mjs';
-import {defaultAntigravityRoots} from './lib/antigravity.mjs';
+import {defaultAntigravityRoots,defaultT3AntigravityRoot,legacyDefaultAntigravityRoots} from './lib/antigravity.mjs';
+import {createAntigravityLimitPoller} from './lib/antigravity-limits.mjs';
 import {collectorStatus,setCollectorEnabled} from './lib/hermes-collector-service.mjs';
 
 const root=path.dirname(fileURLToPath(import.meta.url));
@@ -29,10 +30,21 @@ const bindHost=process.env.ATLAS_HOST||'127.0.0.1';
 if(isIP(bindHost)!==4||bindHost==='0.0.0.0')throw Error('ATLAS_HOST muss eine konkrete IPv4-Adresse sein.');
 const origin=`http://${bindHost}:${port}`;
 const token=randomBytes(32).toString('hex');
-const defaultThresholds={codex:{300:[80,95],10080:[80,95]},claude:{300:[80,95],10080:[80,95]},hermes:{300:[80,95],10080:[80,95]}};
-const defaults={intervalSeconds:30,hiddenProviders:[],limitRetentionDays:90,limitThresholds:defaultThresholds,claudeRoots:[path.join(process.env.CLAUDE_CONFIG_DIR||path.join(os.homedir(),'.claude'),'projects')],codexRoots:[path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'sessions'),path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'archived_sessions')],hermesRoots:[defaultHermesHome()],coworkRoots:[defaultCoworkRoot()],antigravityRoots:defaultAntigravityRoots(),prices:{},pricingMode:'current',priceEffectiveFrom:''};
+const defaultThresholds={codex:{300:[80,95],10080:[80,95]},claude:{300:[80,95],10080:[80,95]},hermes:{300:[80,95],10080:[80,95]},antigravity:{300:[80,95],10080:[80,95]}};
+const defaults={intervalSeconds:30,hiddenProviders:[],limitRetentionDays:90,limitThresholds:defaultThresholds,antigravityLimitPollMinutes:15,claudeRoots:[path.join(process.env.CLAUDE_CONFIG_DIR||path.join(os.homedir(),'.claude'),'projects')],codexRoots:[path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'sessions'),path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'archived_sessions')],hermesRoots:[defaultHermesHome()],coworkRoots:[defaultCoworkRoot()],antigravityRoots:defaultAntigravityRoots(),prices:{},pricingMode:'current',priceEffectiveFrom:''};
+function upgradeLoadedSettings(loaded) {
+ const merged={...defaults,...loaded,limitThresholds:{...defaultThresholds,...(loaded?.limitThresholds||{})}};
+ if(!process.env.ANTIGRAVITY_HOME&&!loaded?.limitThresholds?.antigravity&&Array.isArray(loaded?.antigravityRoots)) {
+  const legacy=legacyDefaultAntigravityRoots(),samePath=(a,b)=>process.platform==='win32'?path.resolve(a).toLowerCase()===path.resolve(b).toLowerCase():path.resolve(a)===path.resolve(b);
+  if(loaded.antigravityRoots.length===legacy.length&&legacy.every((r,i)=>samePath(loaded.antigravityRoots[i],r))) {
+   const t3Root=defaultT3AntigravityRoot();
+   if(!merged.antigravityRoots.some(r=>samePath(r,t3Root)))merged.antigravityRoots=[...merged.antigravityRoots,t3Root];
+  }
+ }
+ return merged;
+}
 let settings={...defaults};
-try {settings={...defaults,...JSON.parse(await fs.readFile(path.join(dataDir,'settings.json'),'utf8'))};}catch{}
+try {settings=upgradeLoadedSettings(JSON.parse(await fs.readFile(path.join(dataDir,'settings.json'),'utf8')));}catch{}
 let priceHistory=new PriceHistory(path.join(dataDir,'price-history.json'));await priceHistory.load();
 // A program update can change bundled prices or pricing rules; record that table once so current
 // valuations keep a snapshot reference and historical mode can use it from now on.
@@ -41,18 +53,21 @@ if(!priceHistory.matchingSnapshot(effectiveRates(settings.prices)))await priceHi
 // cache rewritten on every refresh; limits and metadata are still saved immediately.
 const storeOptions={persistIntervalMs:120000};
 let store=new Store(path.join(dataDir,'usage-cache.json'),priceHistory,storeOptions);await store.load();
+const antigravityPoller=createAntigravityLimitPoller({getSettings:()=>settings,onLimit:limit=>store.recordAntigravityLimit(limit,settings)});
 function validateSettings(x) {
  if(!Number.isInteger(x.intervalSeconds)||x.intervalSeconds<10||x.intervalSeconds>3600)throw Error('Aktualisierung: 10 bis 3600 Sekunden.');
  if(!Array.isArray(x.hiddenProviders)||x.hiddenProviders.some(provider=>!['codex','claude','hermes','antigravity','openrouter'].includes(provider)))throw Error('Ungültige Provider-Sichtbarkeit.');
  const antigravityRoots=x.antigravityRoots===undefined?[]:x.antigravityRoots;
+ const antigravityLimitPollMinutes=x.antigravityLimitPollMinutes===undefined?defaults.antigravityLimitPollMinutes:x.antigravityLimitPollMinutes;
+ if(!Number.isInteger(antigravityLimitPollMinutes)||(antigravityLimitPollMinutes!==0&&(antigravityLimitPollMinutes<5||antigravityLimitPollMinutes>1440)))throw Error('Antigravity-Limit-Abruf: 0 (aus) oder 5 bis 1440 Minuten.');
  for(const list of [x.claudeRoots,x.codexRoots,x.coworkRoots,antigravityRoots])if(!Array.isArray(list)||list.length>20||list.some(p=>typeof p!=='string'||!path.isAbsolute(p)||p.length>2000))throw Error('Bitte gültige absolute Ordnerpfade eintragen.');
  if(!x.prices||typeof x.prices!=='object'||Array.isArray(x.prices))throw Error('Preise müssen ein JSON-Objekt sein.');
  for(const [model,r] of Object.entries(x.prices))if(model.length>120||!Array.isArray(r)||r.length<3||r.length>5||r.some(v=>!Number.isFinite(v)||v<0||v>100000))throw Error('Preise: je Modell 3 bis 5 nichtnegative Zahlen.');
  if(!Number.isInteger(x.limitRetentionDays)||x.limitRetentionDays<30||x.limitRetentionDays>3650)throw Error('Limitverlauf: 30 bis 3650 Tage Aufbewahrung.');
  if(!['current','historical'].includes(x.pricingMode))throw Error('Ungültiger Bewertungsmodus.');
  if(x.priceEffectiveFrom&& !Number.isFinite(Date.parse(x.priceEffectiveFrom)))throw Error('Ungültiger Gültigkeitsbeginn für manuelle Preise.');
- const limitThresholds={};for(const tool of ['codex','claude','hermes']){limitThresholds[tool]={};for(const minutes of [300,10080]){const values=x.limitThresholds?.[tool]?.[minutes]||defaultThresholds[tool][minutes];if(!Array.isArray(values)||values.length<1||values.length>5||values.some(value=>!Number.isFinite(value)||value<=0||value>100))throw Error('Limitschwellen: 1 bis 5 Prozentwerte zwischen 1 und 100.');limitThresholds[tool][minutes]=[...new Set(values)].sort((a,b)=>a-b);}}
- return {intervalSeconds:x.intervalSeconds,hiddenProviders:[...new Set(x.hiddenProviders)],limitRetentionDays:x.limitRetentionDays,limitThresholds,claudeRoots:x.claudeRoots.map(p=>path.resolve(p)),codexRoots:x.codexRoots.map(p=>path.resolve(p)),coworkRoots:x.coworkRoots.map(p=>path.resolve(p)),antigravityRoots:antigravityRoots.map(p=>path.resolve(p)),hermesRoots:validateHermesRoots(x.hermesRoots),prices:x.prices,pricingMode:x.pricingMode,priceEffectiveFrom:x.priceEffectiveFrom?new Date(x.priceEffectiveFrom).toISOString():''};
+ const limitThresholds={};for(const tool of ['codex','claude','hermes','antigravity']){limitThresholds[tool]={};for(const minutes of [300,10080]){const values=x.limitThresholds?.[tool]?.[minutes]||defaultThresholds[tool][minutes];if(!Array.isArray(values)||values.length<1||values.length>5||values.some(value=>!Number.isFinite(value)||value<=0||value>100))throw Error('Limitschwellen: 1 bis 5 Prozentwerte zwischen 1 und 100.');limitThresholds[tool][minutes]=[...new Set(values)].sort((a,b)=>a-b);}}
+ return {intervalSeconds:x.intervalSeconds,hiddenProviders:[...new Set(x.hiddenProviders)],limitRetentionDays:x.limitRetentionDays,limitThresholds,antigravityLimitPollMinutes,claudeRoots:x.claudeRoots.map(p=>path.resolve(p)),codexRoots:x.codexRoots.map(p=>path.resolve(p)),coworkRoots:x.coworkRoots.map(p=>path.resolve(p)),antigravityRoots:antigravityRoots.map(p=>path.resolve(p)),hermesRoots:validateHermesRoots(x.hermesRoots),prices:x.prices,pricingMode:x.pricingMode,priceEffectiveFrom:x.priceEffectiveFrom?new Date(x.priceEffectiveFrom).toISOString():''};
 }
 let mutating=false;
 const restorePlans=new Map();
@@ -60,7 +75,7 @@ async function readBody(req,max){const chunks=[];let size=0;for await(const chun
 async function reloadRuntime(nextDir){
  await loadPriceCache(nextDir);let restored={...defaults,...JSON.parse(await fs.readFile(path.join(nextDir,'settings.json'),'utf8'))};restored=validateSettings(restored);
  const history=new PriceHistory(path.join(nextDir,'price-history.json'));await history.load();if(!history.matchingSnapshot(effectiveRates(restored.prices)))await history.capture({overrides:restored.prices,source:'restore-upgrade',sourceDetails:{note:'Beim Wiederherstellen ergänzter Preisstand'}});
- const nextStore=new Store(path.join(nextDir,'usage-cache.json'),history,storeOptions);await nextStore.load();dataDir=nextDir;settings=restored;priceHistory=history;store=nextStore;
+ const nextStore=new Store(path.join(nextDir,'usage-cache.json'),history,storeOptions);await nextStore.load();dataDir=nextDir;settings=restored;priceHistory=history;store=nextStore;antigravityPoller.configure();
 }
 function mappedRestoreFiles(plan,mappings){
  if(!mappings||!Object.keys(mappings).length)return plan.files;const allowed=new Set((plan.preview.sourceRoots||[]).map(item=>item.path)),pairs=Object.entries(mappings).filter(([,value])=>value);
@@ -92,11 +107,11 @@ const server=http.createServer(async(req,res)=>{
   const url=new URL(req.url,origin);
   if(req.method==='GET') {
    if(url.pathname==='/api/health')return json(200,{app:'session-atlas',version:'1.0.0',revision});
-   if(url.pathname==='/api/bootstrap')return json(200,{token,settings,platform:process.platform,startup:await startupStatus(),hermesCollector:await collectorStatus(),rates:effectiveRates(settings.prices),pricing:priceSyncStatus(),priceHistory:priceHistory.status(),dataDir:dataRoot,activeState:active.id,bridgeScript:path.join(root,'bridge','atlas-statusline.mjs')});
+   if(url.pathname==='/api/bootstrap')return json(200,{token,settings,platform:process.platform,startup:await startupStatus(),hermesCollector:await collectorStatus(),antigravityLimits:antigravityPoller.status(),rates:effectiveRates(settings.prices),pricing:priceSyncStatus(),priceHistory:priceHistory.status(),dataDir:dataRoot,activeState:active.id,bridgeScript:path.join(root,'bridge','atlas-statusline.mjs')});
    if(url.pathname==='/api/hermes-collector/status')return json(200,await collectorStatus());
-   if(url.pathname==='/api/snapshot')return json(200,store.snapshot(settings,{compact:true}));
+   if(url.pathname==='/api/snapshot')return json(200,{...store.snapshot(settings,{compact:true}),antigravityLimitsStatus:antigravityPoller.status()});
    if(url.pathname==='/api/limit-history'){
-    const tool=url.searchParams.get('tool');if(!['codex','claude','hermes'].includes(tool))return json(400,{error:'Ungültiges KI-Tool.'});
+    const tool=url.searchParams.get('tool');if(!['codex','claude','hermes','antigravity'].includes(tool))return json(400,{error:'Ungültiges KI-Tool.'});
     return json(200,{tool,history:store.limitHistory.filter(point=>point.tool===tool),scanCount:store.scanCount});
    }
    if(url.pathname==='/api/session-details'){
@@ -123,7 +138,13 @@ const server=http.createServer(async(req,res)=>{
     if(mutating)return json(409,{error:'Ein lokaler Datenstand wird gerade geändert.'});mutating=true;
     try{const status=await setCollectorEnabled(input.enabled);if(input.enabled)await store.scan(settings,{compact:true});return json(200,status);}finally{mutating=false;}
    }
-   if(url.pathname==='/api/refresh'){if(mutating)return json(409,{error:'Ein lokaler Datenstand wird gerade geändert.'});const snapshot=await store.scan(settings,{compact:true});return json(200,{...snapshot,limitAlerts:store.takeLimitAlerts()});}
+   if(url.pathname==='/api/antigravity-limits/refresh'){
+    if(mutating)return json(409,{error:'Ein lokaler Datenstand wird gerade geändert.'});
+    const result=await antigravityPoller.refresh({force:true});
+    const snapshot=store.snapshot(settings,{compact:true});
+    return json(200,{ok:Boolean(result.ok||result.throttled),throttled:Boolean(result.throttled),status:result.status,error:result.error||null,limits:snapshot.limits,antigravityLimitsStatus:result.status,limitAlerts:store.takeLimitAlerts()});
+   }
+   if(url.pathname==='/api/refresh'){if(mutating)return json(409,{error:'Ein lokaler Datenstand wird gerade geändert.'});const snapshot=await store.scan(settings,{compact:true});return json(200,{...snapshot,antigravityLimitsStatus:antigravityPoller.status(),limitAlerts:store.takeLimitAlerts()});}
    if(url.pathname==='/api/cache/reset'){
     if(mutating)return json(409,{error:'Ein lokaler Datenstand wird gerade geändert.'});mutating=true;let previousCache;
     try{
@@ -161,17 +182,17 @@ const server=http.createServer(async(req,res)=>{
     try {
      if(url.pathname==='/api/startup') {if(typeof input.enabled!=='boolean')throw Error('enabled muss boolean sein.');return json(200,await setStartup(input.enabled,root));}
      const next=validateSettings(input),pricesChanged=JSON.stringify(next.prices)!==JSON.stringify(settings.prices)||next.priceEffectiveFrom!==settings.priceEffectiveFrom;if(store.pending)await store.pending;
-     await fs.mkdir(dataDir,{recursive:true});await fs.writeFile(path.join(dataDir,'settings.json.tmp'),JSON.stringify(next,null,2));await fs.rename(path.join(dataDir,'settings.json.tmp'),path.join(dataDir,'settings.json'));settings=next;
+     await fs.mkdir(dataDir,{recursive:true});await fs.writeFile(path.join(dataDir,'settings.json.tmp'),JSON.stringify(next,null,2));await fs.rename(path.join(dataDir,'settings.json.tmp'),path.join(dataDir,'settings.json'));settings=next;antigravityPoller.configure();
      if(pricesChanged)await priceHistory.capture({overrides:settings.prices,validFrom:settings.priceEffectiveFrom||new Date().toISOString(),source:'manual-settings',sourceDetails:{removedOverrides:Object.keys(input.prices||{}).length===0}});
-     store.repos.clear();return json(200,{settings,priceHistory:priceHistory.status(),rates:effectiveRates(settings.prices)});
+     store.repos.clear();return json(200,{settings,antigravityLimits:antigravityPoller.status(),priceHistory:priceHistory.status(),rates:effectiveRates(settings.prices)});
     }finally {mutating=false;}
    }
-   if(url.pathname==='/api/shutdown') {json(200,{ok:true});server.close();await flushAndExit();return;}
+   if(url.pathname==='/api/shutdown') {json(200,{ok:true});antigravityPoller.stop();server.close();await flushAndExit();return;}
   }
   json(404,{error:'Nicht gefunden.'});
  }catch(e){console.error(e.message);if(!res.headersSent)json(e.statusCode||400,{error:e.message});else res.end();}
 });
-async function flushAndExit(){try{await store.flush();}catch(e){console.error(e.message);}setTimeout(()=>process.exit(0),300).unref();}
+async function flushAndExit(){antigravityPoller.stop();try{await store.flush();}catch(e){console.error(e.message);}setTimeout(()=>process.exit(0),300).unref();}
 for(const signal of ['SIGINT','SIGTERM','SIGHUP'])process.once(signal,()=>{flushAndExit();});
 server.on('error',e=>{console.error(e.code==='EADDRINUSE'?`Port ${port} ist belegt. Starte über ${process.platform==='linux'?'sh Start.sh':'Start.cmd'} oder setze ATLAS_PORT.`:e.message);process.exitCode=1;});
-server.listen(port,bindHost,()=>{console.log(`Session Atlas: ${origin}`);if(process.argv.includes('--open'))openBrowser(origin).catch(e=>console.error(e.message));});
+server.listen(port,bindHost,()=>{antigravityPoller.start();console.log(`Session Atlas: ${origin}`);if(process.argv.includes('--open'))openBrowser(origin).catch(e=>console.error(e.message));});

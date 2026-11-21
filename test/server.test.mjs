@@ -38,11 +38,12 @@ test('HTTP API is local, rejects foreign origins/mutations, validates settings a
  assert.equal((await post('/api/settings',{...bootstrap.settings,intervalSeconds:1})).status,400);
  assert.equal((await post('/api/settings',{...bootstrap.settings,claudeRoots:['relative/path']})).status,400);
  assert.equal((await post('/api/settings',{...bootstrap.settings,hiddenProviders:['other']})).status,400);
+ assert.equal((await post('/api/settings',{...bootstrap.settings,antigravityLimitPollMinutes:2})).status,400);
  const saved=await post('/api/settings',{...bootstrap.settings,intervalSeconds:10,hiddenProviders:['claude','openrouter','claude']});assert.equal(saved.status,200);assert.deepEqual((await saved.json()).settings.hiddenProviders,['claude','openrouter']);
  const reloaded=await(await fetch(base+'/api/bootstrap')).json();assert.deepEqual(reloaded.settings.hiddenProviders,['claude','openrouter']);
  const result=await(await post('/api/refresh',{})).json();assert.deepEqual(result.sessions,[]);assert.equal(result.stats.scanCount,1);
  const snapshot=await(await fetch(base+'/api/snapshot')).json();assert.equal(snapshot.stats.scanCount,1);assert.equal(snapshot.limitHistory,undefined);
- const history=await(await fetch(base+'/api/limit-history?tool=codex')).json();assert.deepEqual(history.history,[]);assert.equal((await fetch(base+'/api/limit-history?tool=hermes')).status,200);assert.equal((await fetch(base+'/api/limit-history?tool=other')).status,400);
+ const history=await(await fetch(base+'/api/limit-history?tool=codex')).json();assert.deepEqual(history.history,[]);assert.equal((await fetch(base+'/api/limit-history?tool=hermes')).status,200);assert.equal((await fetch(base+'/api/limit-history?tool=antigravity')).status,200);assert.equal((await fetch(base+'/api/limit-history?tool=other')).status,400);
  assert.equal((await fetch(base+'/api/session-details?id=codex%3Amissing')).status,404);const exported=await(await fetch(base+'/api/export-data')).json();assert.deepEqual(exported.sessions,[]);
  const reset=await(await post('/api/cache/reset',{})).json();assert.equal(reset.ok,true);assert.deepEqual(reset.snapshot.sessions,[]);assert.equal(typeof reset.snapshot.detailRevision,'string');assert.ok((await fs.stat(reset.fallbackFile)).size>50);
  const backupResponse=await post('/api/backup/export',{});assert.equal(backupResponse.status,200);assert.match(backupResponse.headers.get('content-type'),/application\/gzip/);const backup=await backupResponse.arrayBuffer();assert.ok(backup.byteLength>50);

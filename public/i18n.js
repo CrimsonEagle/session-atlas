@@ -493,6 +493,7 @@ Object.assign(phrases,{
  'Aktiviere eine Quelle in den Einstellungen, um Nutzungsdaten anzuzeigen.':'Enable a source in Settings to display usage data.',
  'Der Standardpfad wird automatisch erkannt. Atlas liest state.db und die Datenbanken benannter Hermes-Profile; weitere absolute Hermes-Verzeichnisse kannst du hier ergänzen. Dafür ist Node.js 22.13+ erforderlich.':'The default path is detected automatically. Atlas reads state.db and databases of named Hermes profiles; you can add other absolute Hermes directories here. Node.js 22.13+ is required.',
  'Standard sind deine .gemini/antigravity-cli- und .gemini/antigravity-Ordner. Atlas liest die Session-Transkripte unter brain sowie Titel, Projektpfade und Subagent-Beziehungen aus den lokalen Metadaten.':'The defaults are your .gemini/antigravity-cli and .gemini/antigravity folders. Atlas reads session transcripts under brain as well as titles, project paths, and subagent relationships from local metadata.',
+ 'Standard sind deine .gemini/antigravity-cli-, .gemini/antigravity- und .t3/userdata/providers/antigravity-Ordner (T3 Code). Atlas liest die Session-Transkripte unter brain sowie Titel, Projektpfade und Subagent-Beziehungen aus den lokalen Metadaten.':'The defaults are your .gemini/antigravity-cli, .gemini/antigravity, and .t3/userdata/providers/antigravity (T3 Code) folders. Atlas reads session transcripts under brain as well as titles, project paths, and subagent relationships from local metadata.',
  'Kosten & Verlauf':'Cost & history','Kein Abo-Limit im Log':'No subscription limit in log','Rollierendes 5-Stunden-Fenster aus lokalen Transkripten':'Rolling 5-hour window from local transcripts','Rollierendes 7-Tage-Fenster aus lokalen Transkripten':'Rolling 7-day window from local transcripts',
  'Ruft LiteLLM, models.dev und OpenRouter ab. Manuelle Einträge behalten Vorrang; Sessiondaten werden nicht übertragen.':'Fetches LiteLLM, models.dev, and OpenRouter. Manual entries take priority; session data is not transmitted.',
  'Eigene Preise in USD pro Million Tokens. Der Modellname muss exakt dem Log entsprechen; für OpenRouter-Routen openrouter:anbieter/modell verwenden.':'Custom prices in USD per million tokens. The model name must match the log exactly; use openrouter:vendor/model for OpenRouter routes.',
@@ -529,7 +530,26 @@ Object.assign(phrases,{
  'Auf diesem Heimnetz kann jedes Gerät mit Zugriff auf Atlas diesen Schalter betätigen. Atlas-Autostart bleibt unverändert.':'On this home network, any device with access to Atlas can use this switch. Atlas autostart remains unchanged.',
  'Sammlung starten':'Start collection','Sammlung stoppen':'Stop collection',
  'Hermes-Sammlung gestartet.':'Hermes collection started.','Hermes-Sammlung gestoppt.':'Hermes collection stopped.',
- 'Dienststatus nicht abrufbar':'Service status unavailable'
+ 'Dienststatus nicht abrufbar':'Service status unavailable',
+ 'Kontingent verfügbar':'Quota available',
+ 'Noch kein Antigravity-Usage-Abruf':'No Antigravity usage fetch yet',
+ 'Antigravity-Limits werden abgerufen …':'Fetching Antigravity limits…',
+ 'Wird abgerufen …':'Fetching…',
+ 'Limits abrufen':'Fetch limits',
+ 'Jetzt abrufen':'Fetch now',
+ 'Antigravity-Limits abrufen':'Fetch Antigravity limits',
+ 'Fragt die offizielle Antigravity-CLI (agy -p /usage) lokal im Hintergrund ab. Verbraucht keine Tokens und startet keinen Modell-Turn (Dauer ca. 20–30 s).':'Queries the official Antigravity CLI (agy -p /usage) locally in the background. Uses no tokens and runs no model turn (takes ~20–30 s).',
+ 'Intervall für automatische Abrufe. 0 deaktiviert den automatischen Hintergrundabruf; manueller Abruf bleibt möglich.':'Interval for automatic fetches. 0 disables automatic background polling; manual refresh remains available.',
+ 'Abrufintervall':'Poll interval',
+ 'Antigravity-Limits aktualisiert.':'Antigravity limits updated.',
+ 'Antigravity-Limits wurden gerade erst abgerufen.':'Antigravity limits were just fetched.',
+ 'Antigravity-Limits konnten nicht abgerufen werden:':'Antigravity limits could not be fetched:',
+ 'Antigravity-CLI':'Antigravity CLI',
+ 'Kontingent':'Quota',
+ 'Deaktiviert':'Disabled',
+ 'Aktiv':'Active',
+ 'Fehler':'Error',
+ 'Min.':'min.'
 });
 
 const replacements=Object.entries(phrases).sort((a,b)=>b[0].length-a[0].length);

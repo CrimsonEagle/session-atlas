@@ -704,6 +704,9 @@ th{font-size:11px}td{font-size:13px}.row-subtitle{font-size:11px}.table-footer{f
 .provider-card .usage-row-end{display:flex;flex-direction:column;align-items:flex-end;gap:5px;margin-top:auto}
 .provider-card .usage-note{font-size:10px;color:var(--muted);text-align:right}
 .provider-card .limit-history-button{width:auto;max-width:100%;margin:0;padding:8px 10px;white-space:normal;text-align:center}
+.provider-card-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;max-width:100%}
+.provider-card .secondary-limit-button{color:var(--muted)}
+.provider-card .secondary-limit-button:hover{color:var(--ink)}
 .provider-below .limit-card .provider-windows{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
 .billing-card .billing-value{display:block;margin:16px 0 3px;font-size:23px;font-weight:700;font-variant-numeric:tabular-nums}
 .billing-card .billing-context{margin:0 0 8px;color:var(--muted);font-size:11px}

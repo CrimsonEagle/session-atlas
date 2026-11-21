@@ -1,6 +1,6 @@
 // Billing providers belong to usage events, not to the client that created the session.
 // Subscription-included Codex usage is not an external account expense.
-const CORE_LIMIT_TOOLS=new Set(['claude','codex','hermes']);
+const CORE_LIMIT_TOOLS=new Set(['claude','codex','hermes','antigravity']);
 export function prioritizeUsageTools(tools) {
  return [...tools.filter(tool=>CORE_LIMIT_TOOLS.has(tool)),...tools.filter(tool=>!CORE_LIMIT_TOOLS.has(tool))];
 }
@@ -55,4 +55,13 @@ export function billingProviderRows(sessions=[]) {
   if(Number.isFinite(event.reportedCost))row.reported+=count;
  }
  return [...groups.values()].sort((a,b)=>a.provider==='openrouter'?-1:b.provider==='openrouter'?1:a.provider.localeCompare(b.provider));
+}
+
+export function antigravityModelMatchesQuota(model,groupName='',bucketId='',{hasSeparateArgon=false}={}) {
+ const m=String(model||'').toLowerCase(),g=String(groupName||'').toLowerCase(),b=String(bucketId||'').toLowerCase();
+ if(!g&&!b)return true;
+ if(b.includes('argon')||g.includes('argon'))return m.includes('argon');
+ if(b.startsWith('3p-')||g.includes('claude')||g.includes('gpt'))return /^(?:claude-|gpt-|o[134]-)/.test(m);
+ if(b.startsWith('gemini-')||g.includes('gemini'))return m.startsWith('gemini-')&&(!hasSeparateArgon||!m.includes('argon'));
+ return true;
 }
